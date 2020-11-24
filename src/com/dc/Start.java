@@ -3,7 +3,7 @@ package com.dc;
 import com.dc.common.Constants;
 import com.dc.config.SgConfig;
 import com.dc.sftp.SshUtil;
-import com.dc.xml.w3c.MetadataXmlParse;
+import com.dc.xml.MetadataXmlParse;
 
 /**
  * 工具启动类

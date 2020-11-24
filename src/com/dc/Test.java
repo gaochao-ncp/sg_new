@@ -1,17 +1,15 @@
 package com.dc;
 
-import cn.hutool.core.util.XmlUtil;
+import com.dc.common.Constants;
 import com.dc.config.SgConfig;
 import com.dc.excel.ExcelParse;
 import com.dc.excel.ExcelSheet;
-import com.dc.unpack.UnpackFactory;
-import com.dc.unpack.UnpackingRoot;
-import com.dc.unpack.metadata.MetadataUnpackFactory;
-import com.dc.xml.w3c.MetadataXmlParse;
-import com.dc.xml.w3c.XmlParse;
-import org.w3c.dom.Document;
+import com.dc.xml.XMLObject;
+import com.dc.xml.XMLParser;
+import com.dc.xml.core.XmlObject;
+import com.dc.xml.core.XmlType;
 
-import java.util.List;
+import java.io.File;
 
 /**
  * @author: Administrator
@@ -27,18 +25,25 @@ public class Test {
     //解析excel
     ExcelParse excelParse = new ExcelParse();
 
-    List<ExcelSheet> excelSheets = excelParse.parseExcel(System.getProperty("user.dir") + "/config/服务治理_字段映射_线上信贷系统_V2.0.2.xls");
+    ExcelSheet excelSheets = excelParse.parseExcel(System.getProperty("user.dir") + "/config/服务治理_字段映射_线上信贷系统_V2.0.2.xls",
+            "1500300000605");
 
-    UnpackFactory metadataFactory = new MetadataUnpackFactory();
-    UnpackingRoot root = metadataFactory.parseAll(excelSheets);
-
-    root.getChildList().forEach(l -> {
-      System.out.println(l.toString());
-    });
+//    UnpackFactory metadataFactory = new MetadataUnpackFactory();
+//    UnpackingRoot root = metadataFactory.parseAll(excelSheets);
+//
+//    root.getChildList().forEach(l -> {
+//      System.out.println(l.toString());
+//    });
 
     //解析 metadata.xml
-    XmlParse parse = new MetadataXmlParse();
-    Document doc = parse.createUnpackingXmlDynamic(root);
-    XmlUtil.toFile(doc,"E:\\metadata.xml");
+//    XMLObject metadata = XMLObject.of("metadata", excelSheets.get(0),
+//            excelSheets.get(1), excelSheets.get(2));
+
+    XmlObject service = XmlObject.of(XmlType.SERVICE_DEFINITION, excelSheets);
+
+    System.out.println(service);
+
+    //XMLParser.transfer(metadata,new File("E:/metadata.xml"));
+    //XMLParser.transfer(service,new File("E:/service.xml"));
   }
 }

@@ -1,13 +1,11 @@
-package com.dc.xml.w3c;
+package com.dc.xml;
 
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.util.StrUtil;
 import cn.hutool.core.util.XmlUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import com.dc.common.Constants;
 import com.dc.config.SgConfig;
-import com.dc.unpack.UnpackingRoot;
 import com.dc.unpack.metadata.MetadataNode;
 import org.w3c.dom.*;
 
@@ -20,31 +18,9 @@ import java.util.stream.Collectors;
  * @date: 2020-11-20 15:50
  * @version: 1.0
  */
-public class MetadataXmlParse extends XmlParse {
+public class MetadataXmlParse {
 
   private static final Log log = LogFactory.get(MetadataXmlParse.class);
-
-  @Override
-  public Document doCreateUnpackingXmlDynamic(String rootElementName, UnpackingRoot unpacking) {
-    if (null == unpacking || CollUtil.isEmpty(unpacking.getChildList())){
-      log.warn("MetadataXmlParse 解析子节点内容为空,请排查原因!");
-      return null;
-    }
-
-    if (StrUtil.isBlank(rootElementName)){
-      // 固定值为 metadata
-      rootElementName = unpacking.getRootName();
-    }
-    Document unpackingDoc = XmlUtil.createXml(rootElementName);
-    Element root = XmlUtil.getRootElement(unpackingDoc);
-    appendChild(root, unpacking.getChildList());
-    return unpackingDoc;
-  }
-
-  @Override
-  public void appendXml(boolean flag) {
-
-  }
 
   /**
    * 对比in端metadata和out端metadata文件的不同

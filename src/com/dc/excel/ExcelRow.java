@@ -12,62 +12,14 @@ import com.dc.common.CommonField;
 public class ExcelRow extends CommonField {
 
   /**
-   * 服务消费者
-   */
-  private String consumerName;
-
-  /**
-   * 服务提供者
-   */
-  private String providerName;
-
-  /**
-   * 交易代码
-   */
-  private String tradeCode;
-
-  /**
-   * 服务编码
-   */
-  private String serviceCode;
-
-  /**
    * 存放路径
    */
   private String path;
 
-
-  public String getConsumerName() {
-    return consumerName;
-  }
-
-  public void setConsumerName(String consumerName) {
-    this.consumerName = consumerName;
-  }
-
-  public String getProviderName() {
-    return providerName;
-  }
-
-  public void setProviderName(String providerName) {
-    this.providerName = providerName;
-  }
-
-  public String getTradeCode() {
-    return tradeCode;
-  }
-
-  public void setTradeCode(String tradeCode) {
-    this.tradeCode = tradeCode;
-  }
-
-  public String getServiceCode() {
-    return serviceCode;
-  }
-
-  public void setServiceCode(String serviceCode) {
-    this.serviceCode = serviceCode;
-  }
+  /**
+   * 是否存在删除线
+   */
+  private boolean isDelete = false;
 
   public String getPath() {
     return path;
@@ -75,5 +27,13 @@ public class ExcelRow extends CommonField {
 
   public void setPath(String path) {
     this.path = path;
+  }
+
+  public boolean isDelete() {
+    return isDelete;
+  }
+
+  public void setDelete(boolean delete) {
+    isDelete = delete;
   }
 }

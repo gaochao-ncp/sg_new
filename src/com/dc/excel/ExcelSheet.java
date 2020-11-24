@@ -1,5 +1,6 @@
 package com.dc.excel;
 
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 
 import java.util.List;
@@ -31,9 +32,19 @@ public class ExcelSheet {
   private List<ExcelRow> outRows;
 
   /**
-   * 索引页的数据信息
+   * 索引页的数据信息：只解析本sheet页对应的那一栏
    */
-  private List<ExcelRow> indexRows;
+  private ExcelIndex index;
+
+  /**
+   * 公共部分 SYS_HEAD
+   */
+  private ExcelSheet sysHead;
+
+  /**
+   * 公共部分 BODY
+   */
+  private ExcelSheet appHead;
 
   /**
    * 是否解析标志
@@ -80,11 +91,27 @@ public class ExcelSheet {
     this.parseFlag = parseFlag;
   }
 
-  public List<ExcelRow> getIndexRows() {
-    return indexRows;
+  public ExcelIndex getIndex() {
+    return index;
   }
 
-  public void setIndexRows(List<ExcelRow> indexRows) {
-    this.indexRows = indexRows;
+  public void setIndex(ExcelIndex index) {
+    this.index = index;
+  }
+
+  public ExcelSheet getSysHead() {
+    return sysHead;
+  }
+
+  public void setSysHead(ExcelSheet sysHead) {
+    this.sysHead = sysHead;
+  }
+
+  public ExcelSheet getAppHead() {
+    return appHead;
+  }
+
+  public void setAppHead(ExcelSheet appHead) {
+    this.appHead = appHead;
   }
 }

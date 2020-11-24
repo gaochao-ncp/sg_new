@@ -29,6 +29,15 @@ public interface Constants {
 	public static final String localTestPath = localEsbHome + "test/";
 
 	/**
+	 * 生成文件标志
+	 */
+	String XML_METADATA = "metadata";
+	String XML_SERVICE = "service";
+	String XML_SYSTEMS = "systems";
+	String XML_Identify = "Identify";
+	String XML_S = "S";
+
+	/**
 	 * 截取 12,3 double类型的数字
 	 */
 	String REGEX = "[0-9]*,[0-9]*";
@@ -69,10 +78,17 @@ public interface Constants {
 	String NODE_ID = "id";
 	String NODE_ENCODE = "encode";
 	String NODE_VALUE = "value";
+	String NODE_PACKAGE_TYPE = "package_type";
+	String NODE_PACKAGE_TYPE_VALUE = "package_type";
+	String NODE_STORE_MODE = "xml";
+	String NODE_STORE_MODE_VALUE = "UTF-8";
 
 	/**
 	 * xml中root节点名称
 	 */
 	String ROOT_METADATA = "metadata";
+
+	String SYS_HEAD = "SYS_HEAD";
+	String APP_HEAD = "APP_HEAD";
 
 }

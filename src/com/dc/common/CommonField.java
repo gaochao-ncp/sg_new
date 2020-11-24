@@ -19,6 +19,20 @@ public class CommonField {
 
   protected String chineseName;
 
+  protected String metadataId;
+
+  protected String isStruct;
+
+  protected String mode;
+
+  protected String id;
+
+  protected String expression;
+
+  protected String encode;
+
+  protected String value;
+
   public String getTagName() {
     return tagName;
   }
@@ -57,5 +71,61 @@ public class CommonField {
 
   public void setScale(String scale) {
     this.scale = scale;
+  }
+
+  public String getMetadataId() {
+    return metadataId;
+  }
+
+  public void setMetadataId(String metadataId) {
+    this.metadataId = metadataId;
+  }
+
+  public String getIsStruct() {
+    return isStruct;
+  }
+
+  public void setIsStruct(String isStruct) {
+    this.isStruct = isStruct;
+  }
+
+  public String getMode() {
+    return mode;
+  }
+
+  public void setMode(String mode) {
+    this.mode = mode;
+  }
+
+  public String getId() {
+    return id;
+  }
+
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  public String getExpression() {
+    return expression;
+  }
+
+  public void setExpression(String expression) {
+    this.expression = expression;
+  }
+
+  public String getEncode() {
+    return encode;
+  }
+
+  public void setEncode(String encode) {
+    this.encode = encode;
+  }
+
+  public String getValue() {
+    return value;
+  }
+
+  public void setValue(String value) {
+    this.value = value;
   }
 }

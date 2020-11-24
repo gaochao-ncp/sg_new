@@ -2,10 +2,16 @@ package com.dc.excel;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.log.Log;
+import cn.hutool.log.LogFactory;
 import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
 import com.dc.common.Constants;
-import com.dc.log.Log;
+import org.apache.poi.hssf.usermodel.HSSFCellStyle;
+import org.apache.poi.hssf.usermodel.HSSFFont;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,6 +27,8 @@ import java.util.stream.Collectors;
  * @version: 1.0
  */
 public class ExcelParse {
+
+  private static final Log log = LogFactory.get(ExcelParse.class);
 
   /**
    * 根据sheet页名称获取 {@link ExcelReader 对象}
@@ -45,11 +53,12 @@ public class ExcelParse {
    * @param absolutePath 绝对路径
    * @return
    */
-  public List<ExcelSheet> parseExcel(String absolutePath){
-    List<ExcelSheet> all = new ArrayList<>();
+  public ExcelAll parseExcel(String absolutePath){
+    ExcelAll excelAll = new ExcelAll();
+    List<ExcelSheet> all = excelAll.getList();
     ExcelReader excelReader = getExcelReader(absolutePath);
     if (excelReader == null){
-      return all;
+      return excelAll;
     }
     //获取所有索引页
     List<String> sheetNames = excelReader.getSheetNames();
@@ -57,7 +66,7 @@ public class ExcelParse {
     sheetNames.stream().skip(1).forEach(sheetName -> {
       all.add(parseExcel(absolutePath,sheetName));
     });
-    return all;
+    return excelAll;
   }
 
   /**
@@ -66,75 +75,116 @@ public class ExcelParse {
    * @param sheetName
    */
   public ExcelSheet parseExcel(String absolutePath, String sheetName){
-    ExcelReader excelReader = getExcelReader(absolutePath,sheetName);
-    return parseExcelSheet(excelReader);
+    if (com.dc.excel.ExcelUtil.verifySheetName(sheetName)){
+      throw new RuntimeException(sheetName+" 无法解析");
+    }
+    //解析表格
+    ExcelSheet sheet = parseExcelSheet(getExcelReader(absolutePath,sheetName));
+    //解析公共部分
+    sheet.setAppHead(parseExcelSheet(getExcelReader(absolutePath,Constants.SHEET_APP_HEAD)));
+    sheet.setSysHead(parseExcelSheet(getExcelReader(absolutePath,Constants.SHEET_SYS_HEAD)));
+    //解析索引页数据信息
+    sheet.setIndex(parseIndex(getExcelReader(absolutePath,Constants.SHEET_INDEX),sheetName));
+    //标志为已解析
+    sheet.setParseFlag(true);
+    return sheet;
   }
 
+  /**
+   * 解析表格
+   * @param excelReader
+   * @return
+   */
   private ExcelSheet parseExcelSheet(ExcelReader excelReader){
     ExcelSheet sheet = new ExcelSheet();
 
-    if (excelReader == null){return sheet;}
-
-    String sheetName = excelReader.getSheet().getSheetName();
-    sheet.setSheetName(sheetName);
-    sheet.setWorkbook(excelReader.getWorkbook());
-
-    //常量对照表目前不解析
-    if (Constants.SHEET_COMMON.equals(sheetName)){
+    if (excelReader == null){
+      log.warn("解析表格为空，请核实！");
       return sheet;
     }
 
-    //对索引页进行特殊的处理
-    boolean index = (Constants.SHEET_INDEX.equals(sheetName))?true:false;
-
-    if (!index){
-      //处理其他的sheet页面,从G行开始读取,输出行默认是第7列开始
-      //计算输入字段和输出字段的位置,非索引页的处理逻辑
-      int rowCount = excelReader.getRowCount();
-      int inStart = 0,inEnd=0,outStart = 0;
-      for (int i = 0; i < rowCount; i++) {
-        //读取7:G列数据
-        String  cellValue = (String) excelReader.readCellValue(6, i);
-        if (Constants.IN_CN.equals(cellValue)){
-          //不包括输入行
-          inStart = i+1;
-        }else if (Constants.OUT_CN.equals(cellValue)){
-          outStart = i+1;
-          inEnd = i-1;
-        }
-      }
-      List<List<Object>> inRowValue = excelReader.read(inStart,inEnd);
-      List<List<Object>> outRowValue = excelReader.read(outStart);
-
-      if (CollUtil.isNotEmpty(inRowValue)){
-        sheet.setInRows(parseExcelRow(inRowValue, false));
-      }
-
-      if (CollUtil.isNotEmpty(outRowValue)){
-        sheet.setOutRows(parseExcelRow(outRowValue, false));
-      }
-    }else {
-      //索引页直接解析
-      List<List<Object>> allRow = excelReader.read();
-      sheet.setIndexRows(parseExcelRow(allRow,true));
+    String sheetName = excelReader.getSheet().getSheetName();
+    //常量对照表和索引页目前不解析
+    if (Constants.SHEET_COMMON.equals(sheetName)
+            || Constants.SHEET_INDEX.equals(sheetName)){
+      return sheet;
     }
 
-    //标志为已解析
-    sheet.setParseFlag(true);
-    return sheet ;
+    sheet.setSheetName(sheetName);
+    sheet.setWorkbook(excelReader.getWorkbook());
 
+    HSSFWorkbook workbook = (HSSFWorkbook) excelReader.getWorkbook();
+
+    int fontIndexAsInt = excelReader.getCell("H9").getCellStyle().getFontIndex();
+    HSSFFont fontAt = workbook.getFontAt(fontIndexAsInt);
+    System.out.println("fontAt.getStrikeout() = " + fontAt.getStrikeout());
+
+    //处理其他的sheet页面,从G行开始读取,输出行默认是第7列开始
+    //计算输入字段和输出字段的位置,非索引页的处理逻辑
+    int rowCount = excelReader.getRowCount();
+    int inStart = 0,inEnd=0,outStart = 0;
+    for (int i = 0; i < rowCount; i++) {
+      //读取7:G列数据
+      String cellValue = (String) excelReader.readCellValue(6, i);
+      if (Constants.IN_CN.equals(cellValue)){
+        //不包括输入行
+        inStart = i+1;
+      }else if (Constants.OUT_CN.equals(cellValue)){
+        outStart = i+1;
+        inEnd = i-1;
+      }
+    }
+
+    List<List<Object>> inRowValue = excelReader.read(inStart,inEnd);
+    List<List<Object>> outRowValue = excelReader.read(outStart);
+
+    if (CollUtil.isNotEmpty(inRowValue)){
+      sheet.setInRows(parseExcelRow(inRowValue));
+    }
+
+    if (CollUtil.isNotEmpty(outRowValue)){
+      sheet.setOutRows(parseExcelRow(outRowValue));
+    }
+    return sheet;
+  }
+
+  /**
+   * 解析 索引 页的数据
+   * @param excelReader
+   * @return
+   */
+  public ExcelIndex parseIndex(ExcelReader excelReader,String sheetName){
+    ExcelIndex index = new ExcelIndex();
+    //索引页直接解析
+    List<List<Object>> allRow = excelReader.read();
+    //索引页第一行标题,截取0-11列的数据,因为存在很多脏数据
+    for (List<Object> row : allRow) {
+      List<String> rowValue = row.stream().map(o -> String.valueOf(o)).collect(Collectors.toList());
+      //找到对应当前excel的那一列数据
+      if (sheetName.equals(rowValue.get(4))){
+        index.setTradeCode(rowValue.get(0));
+        //服务编码
+        index.setServiceCode(rowValue.get(4));
+        index.setConsumerName(rowValue.get(6));
+        index.setProviderName(rowValue.get(7));
+      }
+    }
+
+    if (StrUtil.isBlank(index.getServiceCode())){
+      log.warn("当前sheetName【"+sheetName+"】没有在索引页中搜索到对应的数据");
+    }
+    return index;
   }
 
   /**
    * 解析多行数据
    * @param rows 多行数据
-   * @param index 是否是索引页,索引页需要改变截取原则
    * @return
    */
-  private List<ExcelRow> parseExcelRow(List<List<Object>> rows,boolean index){
+  private List<ExcelRow> parseExcelRow(List<List<Object>> rows){
     List<ExcelRow> rowList = new ArrayList<>();
     rows.stream().forEach(row -> {
-      rowList.add(doParseExcelRow(row,index));
+      rowList.add(doParseExcelRow(row));
     });
     return rowList;
   }
@@ -142,39 +192,32 @@ public class ExcelParse {
   /**
    * 解析单行数据
    * @param row
-   * @param index 是否是索引页的数据
    * @return
    */
-  private ExcelRow doParseExcelRow(List<Object> row,boolean index){
+  private ExcelRow doParseExcelRow(List<Object> row){
     ExcelRow result = new ExcelRow();
-    List<String> rowValue = new ArrayList<>();
-    if (index){
-      //索引页忽略表头的数据,截取0-11列的数据,因为存在很多脏数据
-      rowValue = row.stream().skip(1).map(o -> String.valueOf(o)).collect(Collectors.toList());
-      result.setTradeCode(rowValue.get(0));
-      //服务编码
-      result.setServiceCode(rowValue.get(4));
-      result.setConsumerName(rowValue.get(6));
-      result.setProviderName(rowValue.get(7));
+    //截取row中7:G列之后的数据
+    List<String> rowValue = row.stream().skip(7).map(o -> String.valueOf(o)).collect(Collectors.toList());
+    result.setTagName(rowValue.get(0));
+    String type = rowValue.get(1).replaceAll("[^a-zA-Z]", "").toLowerCase();
+    result.setType(type);
+    if (double.class.getName().equals(type)){
+      String[] value = parseDouble(rowValue.get(1));
+      result.setLength(value[0]);
+      result.setScale(value[1]);
     }else {
-      //截取row中7:G列之后的数据
-      rowValue = row.stream().skip(7).map(o -> String.valueOf(o)).collect(Collectors.toList());
-      result.setTagName(rowValue.get(0));
-      String type = rowValue.get(1).replaceAll("[^a-zA-Z]", "").toLowerCase();
-      result.setType(type);
-      if (double.class.getName().equals(type)){
-        String[] value = parseDouble(rowValue.get(1));
-        result.setLength(value[0]);
-        result.setScale(value[1]);
-      }else {
-        result.setLength(rowValue.get(1).replaceAll("\\D*",""));
-      }
-      result.setChineseName(rowValue.get(2));
-      result.setPath(rowValue.get(3));
+      result.setLength(rowValue.get(1).replaceAll("\\D*",""));
     }
+    result.setChineseName(rowValue.get(2));
+    result.setPath(rowValue.get(3));
     return result;
   }
 
+  /**
+   * 解析type为double时候的length和scale字段
+   * @param value
+   * @return
+   */
   private String[] parseDouble(String value){
     String[] split = new String[2];
     Pattern p = Pattern.compile(Constants.REGEX);
@@ -185,25 +228,6 @@ public class ExcelParse {
     return split;
   }
 
-  public void compareExcelWithMetadataXml(){
 
-  }
-
-  public static void main(String[] args) {
-
-
-
-    System.out.println("Double(10,4)".replaceAll("[^a-zA-Z]","").toLowerCase());
-    System.out.println("String(10)".replaceAll("\\D*",""));
-    ExcelParse excelParse = new ExcelParse();
-    List<ExcelSheet> excelSheets = excelParse.parseExcel(System.getProperty("user.dir") + "/config/服务治理_字段映射_线上信贷系统_V2.0.2.xls");
-
-    excelSheets.forEach(sheet -> {
-      System.out.println(sheet);
-    });
-
-    Log.info("testrizhi");
-
-  }
 
 }
