@@ -1,6 +1,11 @@
 package com.dc.common;
 
+import com.dc.xml.XmlObject;
+import com.dc.xml.XmlType;
+
 import java.io.File;
+import java.util.Arrays;
+import java.util.List;
 
 public interface Constants {
 
@@ -26,6 +31,10 @@ public interface Constants {
 
 	public static final String localTestPath = localEsbHome + "test/";
 
+	/**
+	 * 要生成的文件类型
+	 */
+	List<XmlType> XML_TYPE_LIST = Arrays.asList(new XmlType[]{XmlType.METADATA,XmlType.SERVICE,XmlType.SERVICE_DEFINITION});
 
 	/**
 	 * 截取 12,3 double类型的数字

@@ -7,12 +7,14 @@ import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
+import cn.hutool.poi.excel.WorkbookUtil;
 import com.dc.common.CommonUtil;
 import com.dc.common.Constants;
 import com.dc.config.HrConfig;
 import com.dc.config.HrSystem;
 import org.apache.poi.hssf.usermodel.HSSFFont;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Workbook;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -238,6 +240,7 @@ public class ExcelParse {
    * @return
    */
   public static Map<String, HrSystem> parseSystemMapping(String absolutePath){
+    //Constants.SHEET_SYSTEM
     ExcelReader reader = ExcelUtil.getReader(new File(absolutePath), Constants.SHEET_SYSTEM);
     Map<String, HrSystem> map = new HashMap<>(99);
     if (reader != null){
@@ -248,7 +251,7 @@ public class ExcelParse {
       collect.stream().forEach(row -> {
         //只取前三行的数据
         List<String> system = row.stream().limit(3).map(o -> String.valueOf(o)).collect(Collectors.toList());
-        HrSystem info = new HrSystem(system.get(0),system.get(1),Integer.valueOf(system.get(2)));
+        HrSystem info = new HrSystem(system.get(0).trim(),system.get(1).trim(),Integer.valueOf(system.get(2).trim()));
         map.put(system.get(0),info);
       });
     }

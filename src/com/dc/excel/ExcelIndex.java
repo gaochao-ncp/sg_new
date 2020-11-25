@@ -1,7 +1,9 @@
 package com.dc.excel;
 
+import cn.hutool.core.util.StrUtil;
+
 /**
- * 索引信息
+ * 索引信息 字段信息进行trim()处理
  * @author: Administrator
  * @date: 2020-11-24 11:50
  * @version: 1.0
@@ -33,7 +35,9 @@ public class ExcelIndex {
   }
 
   public void setConsumerName(String consumerName) {
-    this.consumerName = consumerName;
+    if (StrUtil.isNotBlank(consumerName)){
+      this.consumerName = consumerName.trim();
+    }
   }
 
   public String getProviderName() {
@@ -41,7 +45,9 @@ public class ExcelIndex {
   }
 
   public void setProviderName(String providerName) {
-    this.providerName = providerName;
+    if (StrUtil.isNotBlank(providerName)){
+      this.providerName = providerName.trim();
+    }
   }
 
   public String getTradeCode() {
@@ -49,7 +55,9 @@ public class ExcelIndex {
   }
 
   public void setTradeCode(String tradeCode) {
-    this.tradeCode = tradeCode;
+    if (StrUtil.isNotBlank(tradeCode)){
+      this.tradeCode = tradeCode;
+    }
   }
 
   public String getServiceCode() {
@@ -57,6 +65,8 @@ public class ExcelIndex {
   }
 
   public void setServiceCode(String serviceCode) {
-    this.serviceCode = serviceCode;
+    if (StrUtil.isNotBlank(serviceCode)){
+      this.serviceCode = serviceCode.trim();
+    }
   }
 }

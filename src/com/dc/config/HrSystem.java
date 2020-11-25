@@ -1,5 +1,7 @@
 package com.dc.config;
 
+import cn.hutool.core.util.StrUtil;
+
 /**
  * 华融消费之系统映射
  *
@@ -17,8 +19,12 @@ public class HrSystem {
   private Integer port;
 
   public HrSystem(String code, String value, Integer port) {
-    this.code = code;
-    this.value = value;
+    if (StrUtil.isNotBlank(code)){
+      this.code = code.trim();
+    }
+    if (StrUtil.isNotBlank(value)){
+      this.value = value.trim();
+    }
     this.port = port;
   }
 

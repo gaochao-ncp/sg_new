@@ -1,14 +1,19 @@
 package com.dc.xml;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import com.dc.common.Constants;
+import com.dc.config.HrConfig;
 import com.dc.config.HrSystem;
+import com.dc.excel.ExcelIndex;
 import com.dc.excel.ExcelRow;
 import com.dc.excel.ExcelSheet;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +33,7 @@ public class XmlObject {
   private Map<String, String> attrs;
 
   /**
-   * 子标签集合:包含输入输出字段
+   * 子标签集合:包含输入输出字段。 key：in|out ==>Constants.IN Constants.OUT
    */
   private Map<String, List<XmlObject>> childTags = new LinkedHashMap<>();
 
@@ -43,9 +48,15 @@ public class XmlObject {
   private boolean rootElement = false;
 
   /**
-   * 注释节点.
+   * 是否是注释节点.默认false
+   * //todo List<XmlComment> 这种数据格式待考证
    */
-  private List<XmlContext> contexts;
+  private boolean isComment = false;
+
+  /**
+   * 自定义注释内容，默认的话 是当前时间+服务码
+   */
+  private String comment;
 
   /**
    * 标签名
@@ -63,13 +74,14 @@ public class XmlObject {
   private String serviceCode;
 
   /**
-   * 系统渠道信息
+   * 系统渠道信息:接入系统和消费系统信息
    */
-  private HrSystem system;
+  private List<HrSystem> system;
 
   /**
-   * xml文件类型
+   * xml文件类型:这个属性进行废弃
    */
+  @Deprecated
   private XmlType xmlType;
 
   public XmlObject(){}
@@ -111,58 +123,72 @@ public class XmlObject {
   }
 
   /**
-   * 将Excel转换成对应需要转换的xml类型
-   * @param xmlType 生成的根节点的类型
+   * 批量解析
    * @param sheets
    * @return
    */
-  public static XmlObject of(XmlType xmlType,ExcelSheet... sheets){
+  public static XmlMetadata ofBatch(ExcelSheet... sheets){
+    XmlMetadata metadata = new XmlMetadata();
+    for (ExcelSheet sheet : sheets) {
+      XmlObject xmlObject = of(sheet);
+      metadata.parseXmlObject(xmlObject);
+    }
+    return metadata;
+  }
+
+  /**
+   * 解析单个Excel转换成对应需要转换的xml类型
+   * @param sheet
+   * @return
+   */
+  private static XmlObject of(ExcelSheet sheet){
     XmlObject result = new XmlObject();
 
-    //传入多个sheet页但是类型不为metadata的时候报错
-    if (sheets.length > 1 && !XmlType.METADATA.equals(xmlType)){
-      log.warn("当解析多个sheet时，请将参数设置为 XmlType.METADATA");
-      return result;
-    }
+    result.setServiceCode(sheet.getIndex().getServiceCode());
+    //处理输入字段
+    result.setChildTags(sheet.getInRows(),Constants.IN);
 
-    //后续处理要用到这个属性，所以前置赋值
-    result.setXmlType(xmlType);
-    //当传入多个
-    for (ExcelSheet sheet : sheets){
-      result.setServiceCode(sheet.getIndex().getServiceCode());
-      //处理输入字段
-      result.setChildTags(sheet.getInRows(),Constants.IN);
-      //处理输出字段
-      result.setChildTags(sheet.getOutRows(),Constants.OUT);
-      //解析公共部分
-      ExcelSheet appHead = sheet.getAppHead();
-      result.setChildTags(appHead.getOutRows(),Constants.OUT);
-      result.setChildTags(appHead.getInRows(),Constants.IN);
-      ExcelSheet sysHead = sheet.getSysHead();
-      result.setChildTags(sysHead.getOutRows(),Constants.OUT);
-      result.setChildTags(sysHead.getInRows(),Constants.IN);
-    }
+    //处理输出字段
+    result.setChildTags(sheet.getOutRows(),Constants.OUT);
 
-    //给service节点添加属性
-    if (XmlType.SERVICE.equals(xmlType)){
-      result.setAttrs(Constants.NODE_PACKAGE_TYPE,Constants.NODE_PACKAGE_TYPE_VALUE);
-      result.setAttrs(Constants.NODE_STORE_MODE,Constants.NODE_STORE_MODE_VALUE);
-    }
+    //解析公共部分
+    ExcelSheet appHead = sheet.getAppHead();
+    result.setChildTags(appHead.getOutRows(),Constants.OUT);
+    result.setChildTags(appHead.getInRows(),Constants.IN);
+    ExcelSheet sysHead = sheet.getSysHead();
+    result.setChildTags(sysHead.getOutRows(),Constants.OUT);
+    result.setChildTags(sysHead.getInRows(),Constants.IN);
+
+    //解析索引部分:用于生成服务识别和系统识别文件
+    ExcelIndex index = sheet.getIndex();
+    result.setSystem(index);
 
     //根节点
     result.setRootElement(true);
-    //设置根节点名称
-    result.setTagName();
     return result;
   }
 
   /**
-   * 解析SYS_HEAD APP_HEAD 公共部分
-   * @param common
+   * 解析 索引页中的系统code和名称,系统渠道信息
+   * @param index
    */
-  private void setChildTags(ExcelSheet common){
-
-
+  private void setSystem(ExcelIndex index){
+    if (ObjectUtil.isNotEmpty(index)){
+      HrSystem consumer = HrConfig.getConfig().systemMappings.get(index.getConsumerName());
+      HrSystem provider = HrConfig.getConfig().systemMappings.get(index.getProviderName());
+      List<HrSystem> system = new ArrayList<>(2);
+      if (ObjectUtil.isNotEmpty(consumer)){
+        system.add(consumer);
+      }else {
+        log.warn("c端渠道：【"+index.getConsumerName()+"】无法找到对应的信息，请检查配置");
+      }
+      if (ObjectUtil.isNotEmpty(provider)){
+        system.add(provider);
+      }else {
+        log.warn("P端渠道：【"+index.getProviderName()+"】无法找到对应的信息，请检查配置");
+      }
+      setSystem(system);
+    }
   }
 
   /**
@@ -231,8 +257,23 @@ public class XmlObject {
     return false;
   }
 
-  private void setAttrs(String key ,String value){
+  /**
+   * 添加属性
+   * @param key
+   * @param value
+   */
+  public void setAttrs(String key ,String value){
     getAttrs().put(key,value);
+  }
+
+  /**
+   * 清空对应的属性
+   */
+  public void clearAttrs(){
+    Map<String, String> attrs = getAttrs();
+    if (MapUtil.isNotEmpty(attrs)){
+      attrs.clear();
+    }
   }
 
   /**
@@ -323,12 +364,20 @@ public class XmlObject {
     this.rootElement = rootElement;
   }
 
-  public List<XmlContext> getContexts() {
-    return contexts;
+  public boolean isComment() {
+    return isComment;
   }
 
-  public void setContexts(List<XmlContext> contexts) {
-    this.contexts = contexts;
+  public void setComment(boolean comment) {
+    isComment = comment;
+  }
+
+  public String getComment() {
+    return comment;
+  }
+
+  public void setComment(String comment) {
+    this.comment = comment;
   }
 
   public String getTagName() {
@@ -346,8 +395,7 @@ public class XmlObject {
   /**
    * 根据自身生成的文件类型来确定根节点名称
    */
-  public void setTagName(){
-    XmlType xmlType = getXmlType();
+  public void setTagName(XmlType xmlType){
     String tagName = xmlType.getRootName();
     if (XmlType.SERVICE_DEFINITION.equals(xmlType)){
       tagName += getServiceCode();
@@ -371,20 +419,12 @@ public class XmlObject {
     this.serviceCode = serviceCode;
   }
 
-  public HrSystem getSystem() {
+  public List<HrSystem> getSystem() {
     return system;
   }
 
-  public void setSystem(HrSystem system) {
+  public void setSystem(List<HrSystem> system) {
     this.system = system;
-  }
-
-  public XmlType getXmlType() {
-    return xmlType;
-  }
-
-  public void setXmlType(XmlType xmlType) {
-    this.xmlType = xmlType;
   }
 
 }

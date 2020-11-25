@@ -8,6 +8,7 @@ import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 
 import com.dc.common.Constants;
+import com.dc.core.MetadataNode;
 import org.dom4j.*;
 import org.dom4j.io.OutputFormat;
 import org.dom4j.io.SAXReader;
@@ -65,6 +66,80 @@ public class XpathParser {
     return newNode;
   }
 
+
+  /**
+   * 直接将 XmlObject对象转换为文件输出
+   * 一个对象生成三种类型的文件:metadata 拆包（in|out） 组包（in|out）
+   * @param xmlObject
+   * @return
+   */
+  public static boolean ofTransfer(XmlObject xmlObject){
+    Constants.XML_TYPE_LIST.stream().forEach(xmlType -> {
+      //设置根节点名称
+      xmlObject.setTagName(xmlType);
+      //根据XmlType决定对应的路径
+      String absolutePath = "";
+      if (XmlType.METADATA.equals(xmlType)){
+
+
+        ofTransfer(absolutePath,xmlObject);
+      }else if (XmlType.SERVICE.equals(xmlType)){
+        //给 Service 节点设置属性
+        xmlObject.setAttrs(Constants.NODE_PACKAGE_TYPE,Constants.NODE_PACKAGE_TYPE_VALUE);
+        xmlObject.setAttrs(Constants.NODE_STORE_MODE,Constants.NODE_STORE_MODE_VALUE);
+
+
+        //最后将设置的属性清空
+        xmlObject.clearAttrs();
+      }else if (XmlType.SERVICE_DEFINITION.equals(xmlType)){
+
+      }else {
+        log.warn("没有找到对应的XmlType，无法生成对应的文件，请检查 Constants.XML_TYPE_LIST 是否配置正确");
+      }
+    });
+
+
+    return true;
+  }
+
+  /**
+   * 直接将 XmlObject对象转换为文件输出,此方法不暴露给外人调用，防止修改默认规则
+   * @param absolutePath 可以不指定，有默认的输出位置
+   * @param xmlObject xml对象
+   * @return
+   */
+  private static boolean ofTransfer(String absolutePath,XmlObject xmlObject){
+
+    if (StrUtil.isBlank(absolutePath)){
+
+    }
+
+    return transfer(absolutePath, createDom4j(xmlObject));
+  }
+
+  /**
+   * 处理元数据节点
+   * @param metadataNodes
+   * @return
+   */
+  public static Document createMetadataDocument(List<MetadataNode> metadataNodes){
+    Document newDoc = DocumentHelper.createDocument();
+    Element root = newDoc.addElement(XmlType.METADATA.getRootName());
+    //获取节点名称
+    metadataNodes.stream().forEach(metadataNode -> {
+
+      if (metadataNode.isComment()){
+        //创建注释节点
+        root.addComment(metadataNode.getComment());
+      }else {
+        //创建子节点
+        Element childElement = root.addElement(metadataNode.getNodeName());
+        metadataNode.setAttr(childElement);
+      }
+    });
+    return newDoc;
+  }
+
   /**
    * 将XmlObject解析成对应的Document对象
    * @param xmlObject
@@ -91,21 +166,18 @@ public class XpathParser {
     List<XmlObject> in = childTags.get(Constants.IN);
     List<XmlObject> out = childTags.get(Constants.OUT);
 
-    dealChildTags(in,newDoc);
-    dealChildTags(out,newDoc);
-
-    //处理注释节点
-    List<XmlContext> contexts = xmlObject.getContexts();
-    attributeContent(newDoc,contexts);
-
     //生成metadata.xml文件,所有节点全部处理
     if (XmlType.METADATA.equals(xmlType)){
-      //appendMetaDataChild();
-
+      dealChildTags(in,newDoc);
+      dealChildTags(out,newDoc);
     }else if (XmlType.SERVICE_DEFINITION.equals(xmlType)){
 
     }
 
+
+    //处理注释节点
+    List<XmlComment> contexts = xmlObject.getContexts();
+    attributeContent(newDoc,contexts);
 
 
     return newDoc;
@@ -116,6 +188,7 @@ public class XpathParser {
    * @param childTags
    * @param newDoc
    */
+  @Deprecated
   public static void dealChildTags(List<XmlObject> childTags,Document newDoc){
     if (CollUtil.isNotEmpty(childTags)){
       childTags.stream().forEach(childTag -> {
@@ -153,10 +226,11 @@ public class XpathParser {
       return (Element) doc.selectSingleNode(xpath);
 
     }
-    String path1 = xpath.substring(0, xpath.lastIndexOf("/"));
-    Element e = (Element) doc.selectSingleNode(path1);
+
+    String path = xpath.substring(0, xpath.lastIndexOf("/"));
+    Element e = (Element) doc.selectSingleNode(path);
     if (null == e) {
-      e = createByXPath(doc, path1);
+      e = createByXPath(doc, path);
       if (e.getParent().getName().toLowerCase().equals("array")) {
         e.addAttribute("metadataid", e.getName());
         e.addAttribute("type", "array");
@@ -183,20 +257,21 @@ public class XpathParser {
   }
 
   /**
-   * 给节点设置属性值
+   * //todo 给节点设置属性值 逻辑需要完善
    * @param doc
    * @param contexts
    */
-  public static void attributeContent(Document doc,List<XmlContext> contexts){
+  @Deprecated
+  public static void attributeContent(Document doc,List<XmlComment> contexts){
     if (CollUtil.isNotEmpty(contexts)){
-      contexts.stream().forEach(xmlContext -> {
-        //查找开始节点信息
-        Element startNode = (Element)doc.selectSingleNode(xmlContext.getStartContext());
-        attributeContent(startNode, xmlContext.getStartContext());
-        //查找结束节点信息
-        Element endNode = (Element)doc.selectSingleNode(xmlContext.getEndXpath());
-        attributeContent(endNode, xmlContext.getEndContext());
-      });
+//      contexts.stream().forEach(xmlContext -> {
+//        //查找开始节点信息
+//        Element startNode = (Element)doc.selectSingleNode(xmlContext.getStartContext());
+//        attributeContent(startNode, xmlContext.getStartContext());
+//        //查找结束节点信息
+//        Element endNode = (Element)doc.selectSingleNode(xmlContext.getEndXpath());
+//        attributeContent(endNode, xmlContext.getEndContext());
+//      });
     }
   }
 
