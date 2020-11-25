@@ -1,8 +1,8 @@
-package com.dc.xml.impl;
+package com.dc.xml.deprecated.impl;
 
 import cn.hutool.core.util.StrUtil;
-import com.dc.xml.XMLObject;
-import com.dc.xml.XMLObjectFormatter;
+import com.dc.xml.deprecated.XMLObject;
+import com.dc.xml.deprecated.XMLObjectFormatter;
 
 import java.util.List;
 import java.util.Map;
@@ -14,6 +14,7 @@ import java.util.Map;
  * @date: 2020-11-21 20:09
  * @version: 1.0
  */
+@Deprecated
 public class DefaultXMLObjectFormatter implements XMLObjectFormatter {
 
   /**

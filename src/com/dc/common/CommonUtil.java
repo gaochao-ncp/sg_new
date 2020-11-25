@@ -1,8 +1,8 @@
 package com.dc.common;
 
+import cn.hutool.log.Log;
+import cn.hutool.log.LogFactory;
 import com.dc.excel.ExcelSheet;
-
-import java.util.List;
 
 /**
  * 通用工具类
@@ -12,6 +12,8 @@ import java.util.List;
  * @version: 1.0
  */
 public class CommonUtil {
+
+  private static final Log log = LogFactory.get(CommonUtil.class);
 
   /**
    * 解析metadata.xml的时候对不需要的sheet进行过滤
@@ -24,6 +26,22 @@ public class CommonUtil {
       return false;
     }
     return true;
+  }
+
+  /**
+   * 校验sheet页名称是否合法
+   * @param sheetName
+   * @return
+   */
+  public static boolean verifySheetName(String sheetName){
+    if (Constants.SHEET_COMMON.equals(sheetName)
+            || Constants.SHEET_INDEX.equals(sheetName)
+            || Constants.SHEET_SYS_HEAD.equals(sheetName)
+            || Constants.SHEET_APP_HEAD.equals(sheetName)){
+      log.warn("非法解析sheetName：【"+sheetName+"】");
+      return true;
+    }
+    return false;
   }
 
 }

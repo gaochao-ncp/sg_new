@@ -1,15 +1,12 @@
 package com.dc;
 
-import com.dc.common.Constants;
-import com.dc.config.SgConfig;
+import com.dc.config.HrConfig;
 import com.dc.excel.ExcelParse;
 import com.dc.excel.ExcelSheet;
-import com.dc.xml.XMLObject;
-import com.dc.xml.XMLParser;
-import com.dc.xml.core.XmlObject;
-import com.dc.xml.core.XmlType;
-
-import java.io.File;
+import com.dc.xml.XmlObject;
+import com.dc.xml.XmlType;
+import com.dc.xml.XpathParser;
+import org.dom4j.Document;
 
 /**
  * @author: Administrator
@@ -18,7 +15,7 @@ import java.io.File;
  */
 public class Test {
 
-  static SgConfig config = SgConfig.getConfig();
+  static HrConfig config = HrConfig.getConfig();
 
   public static void main(String[] args) {
 
@@ -40,6 +37,10 @@ public class Test {
 //            excelSheets.get(1), excelSheets.get(2));
 
     XmlObject service = XmlObject.of(XmlType.SERVICE_DEFINITION, excelSheets);
+
+    Document dom4j = XpathParser.createDom4j(service);
+
+    XpathParser.transfer("E:/metadata.xml",dom4j);
 
     System.out.println(service);
 

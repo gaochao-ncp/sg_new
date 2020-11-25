@@ -7,14 +7,18 @@ import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import cn.hutool.poi.excel.ExcelReader;
 import cn.hutool.poi.excel.ExcelUtil;
+import com.dc.common.CommonUtil;
 import com.dc.common.Constants;
-import org.apache.poi.hssf.usermodel.HSSFCellStyle;
+import com.dc.config.HrConfig;
+import com.dc.config.HrSystem;
 import org.apache.poi.hssf.usermodel.HSSFFont;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
-import org.apache.poi.ss.usermodel.*;
 
+import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -75,7 +79,7 @@ public class ExcelParse {
    * @param sheetName
    */
   public ExcelSheet parseExcel(String absolutePath, String sheetName){
-    if (com.dc.excel.ExcelUtil.verifySheetName(sheetName)){
+    if (CommonUtil.verifySheetName(sheetName)){
       throw new RuntimeException(sheetName+" 无法解析");
     }
     //解析表格
@@ -228,6 +232,28 @@ public class ExcelParse {
     return split;
   }
 
+  /**
+   * 解析消费者系统英文名和中文名的映射关系
+   * @param absolutePath
+   * @return
+   */
+  public static Map<String, HrSystem> parseSystemMapping(String absolutePath){
+    ExcelReader reader = ExcelUtil.getReader(new File(absolutePath), Constants.SHEET_SYSTEM);
+    Map<String, HrSystem> map = new HashMap<>(99);
+    if (reader != null){
+      //读取所有的行信息
+      List<List<Object>> rows = reader.read();
+      //忽略前面两行无用
+      List<List<Object>> collect = rows.stream().skip(2).collect(Collectors.toList());
+      collect.stream().forEach(row -> {
+        //只取前三行的数据
+        List<String> system = row.stream().limit(3).map(o -> String.valueOf(o)).collect(Collectors.toList());
+        HrSystem info = new HrSystem(system.get(0),system.get(1),Integer.valueOf(system.get(2)));
+        map.put(system.get(0),info);
+      });
+    }
+    return map;
+  }
 
 
 }

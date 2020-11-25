@@ -1,17 +1,13 @@
-package com.dc.xml;
+package com.dc.xml.deprecated;
 
-import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.util.XmlUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import org.dom4j.*;
 import org.dom4j.io.SAXReader;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 
 /**
  * XML解析器, 注意:一个解析器只能绑定一个XML文件.
@@ -28,6 +24,7 @@ import java.util.Map;
  * @author Huang.Yong
  * @see XMLObject
  */
+@Deprecated
 public class XMLParser {
 
     private static final Log log = LogFactory.get(XMLParser.class);
@@ -70,6 +67,10 @@ public class XMLParser {
      */
     public XMLParser(String path, Charset fileEncoding) {
         this(path, fileEncoding.name());
+    }
+
+    public static XMLObject createNode(String tagName, Object o, Object o1) {
+        return null;
     }
 
     /**
@@ -231,89 +232,6 @@ public class XMLParser {
         return new File(path);
     }
 
-    /**
-     * 转换为文件
-     *
-     * @param root       根元素
-     * @param outputFile 输出文件
-     * @return boolean true-转换成功, false-转换失败
-     */
-    public static boolean transfer(XMLObject root, File outputFile) {
-        // root校验
-        if (null == root || !root.isRootElement()) {
-            log.debug("指定节点不是有效根节点");
-            return false;
-        }
 
-        // 后缀检测
-        if (!outputFile.getName().endsWith(".xml")) {
-            log.debug("输出文件不是.xml文件");
-            return false;
-        }
-        createFile(outputFile);
-
-        // 类型检测
-        if (!outputFile.isFile()) {
-            log.debug(outputFile.getAbsolutePath()+" 不是文件类型");
-            return false;
-        }
-
-        // 格式化输出
-        // 创建格式化输出工具
-        XMLObjectFormatter formatter = XMLObjectFormatterFactory.createFormatter();
-
-        // 执行格式化
-        StringBuilder content = formatter.format(root);
-
-        // 将格式化内容写入文件
-        FileUtil.writeUtf8String(content.toString(),outputFile);
-        return true;
-    }
-
-    /**
-     * 创建新标签
-     *
-     * @param tagName 标签名
-     * @param content 标签体
-     * @param attrs   属性列表
-     * @return XMLObject 新节点对象
-     */
-    public static XMLObject createNode(String tagName, String content, Map<String, String> attrs) {
-        XMLObject newNode = new XMLObject(tagName, content, attrs);
-        newNode.setParent(null);
-        return newNode;
-    }
-
-    /**
-     * 创建文件, 已存在就删除
-     *
-     * @param file 目标文件
-     * @return 创建成功返回true, 否则返回false
-     */
-    public static boolean createFile(File file) {
-        createFileParentDir(file);
-        if (file.exists() && file.delete()){
-            log.debug(file.getName()+"已存在,进行删除操作");
-        }
-        try {
-            return file.createNewFile();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * 创建文件所在目录
-     *
-     * @param file 文件对象
-     * @return 创建成功返回true, 否则返回false
-     */
-    public static boolean createFileParentDir(File file) {
-        File dir = file.getParentFile();
-        if (!dir.exists()){
-            return dir.mkdirs();
-        }
-        return false;
-    }
 
 }

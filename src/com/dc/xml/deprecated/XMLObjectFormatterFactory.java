@@ -1,13 +1,14 @@
-package com.dc.xml;
+package com.dc.xml.deprecated;
 
 
-import com.dc.xml.impl.DefaultXMLObjectFormatter;
+import com.dc.xml.deprecated.impl.DefaultXMLObjectFormatter;
 
 /**
  * {@link XMLObject}格式化工厂
  *
  * @author
  */
+@Deprecated
 public class XMLObjectFormatterFactory {
 
     /**

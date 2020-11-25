@@ -1,14 +1,14 @@
-package com.dc.xml;
+package com.dc.xml.deprecated;
 
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.util.StrUtil;
 import com.dc.common.CommonUtil;
-import com.dc.common.Constants;
 import com.dc.excel.ExcelRow;
 import com.dc.excel.ExcelSheet;
 import com.dc.log.Log;
+import com.dc.xml.XmlType;
 
 import java.io.Serializable;
 import java.util.*;
@@ -19,6 +19,7 @@ import java.util.Map.Entry;
  *
  * @author Huang.Yong
  */
+@Deprecated
 public class XMLObject implements Serializable {
 
     private static final long serialVersionUID = 7702755997734263716L;
@@ -86,13 +87,13 @@ public class XMLObject implements Serializable {
      * //todo:
      * 将Excel读取的对象{@link com.dc.excel.ExcelSheet}转换为XMLObject root数据
      * @param sheets
-     * @param tagName {@link com.dc.common.Constants#XML_METADATA}
+     * @param tagName {@link com.dc.common.Constants#}
      * @return XMLObject实体, 目标对象为null时总是返回null
      */
     public static XMLObject of(String tagName,ExcelSheet... sheets) {
         XMLObject root = new XMLObject(tagName);
         List<ExcelRow> rowList = new ArrayList<>();
-        if (Constants.XML_METADATA.equals(tagName)){
+        if (XmlType.METADATA.getRootName().equals(tagName)){
             for (ExcelSheet sheet : sheets) {
                 if (!CommonUtil.filterSheet(sheet)){
                     continue;

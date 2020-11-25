@@ -5,7 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.ssh.Sftp;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
-import com.dc.config.SgConfig;
+import com.dc.config.HrConfig;
 
 import java.nio.charset.Charset;
 import java.util.Map;
@@ -18,7 +18,7 @@ public class SshUtil {
 
 	private static final Log log = LogFactory.get(SshUtil.class);
 
-	private static SgConfig config = new SgConfig();
+	private static HrConfig config = new HrConfig();
 
 	public static Sftp client(){
 		Sftp conn = new Sftp(config.getSshIp(), 22, config.getSshUser(), config.getSshPwd(), Charset.forName("UTF-8"));
@@ -32,8 +32,8 @@ public class SshUtil {
 	 * 下载全部Metadata.xml
 	 */
 	public static void download(){
-		if (config.localUrl != null && config.localUrl.size()>0){
-			for (Map.Entry<String, String> entry : config.localUrl.entrySet()) {
+		if (config.LOCAL_URL != null && config.LOCAL_URL.size()>0){
+			for (Map.Entry<String, String> entry : config.LOCAL_URL.entrySet()) {
 				String local = entry.getValue();
 				String remoteType = entry.getKey();
 				download(local,remoteType);
@@ -43,7 +43,7 @@ public class SshUtil {
 
 	public static void download(String remoteType){
 		//自动获得路径
-		String toLocal = config.localUrl.get(remoteType);
+		String toLocal = config.LOCAL_URL.get(remoteType);
 		download(toLocal,remoteType);
 	}
 
@@ -53,12 +53,11 @@ public class SshUtil {
 	 * @param remoteType 远程路径标识
 	 */
 	public static void download(String toLocal,String remoteType){
-		String url = config.remoteUrl.get(remoteType);
+		String url = config.REMOTE_URL.get(remoteType);
 		if (StrUtil.isBlank(url)){
 			log.error("下载地址无法解析");
 			return;
 		}
-
 		client().download(url, FileUtil.file(toLocal));
 	}
 

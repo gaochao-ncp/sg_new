@@ -1,8 +1,6 @@
 package com.dc.common;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
 
 public interface Constants {
 
@@ -28,14 +26,6 @@ public interface Constants {
 
 	public static final String localTestPath = localEsbHome + "test/";
 
-	/**
-	 * 生成文件标志
-	 */
-	String XML_METADATA = "metadata";
-	String XML_SERVICE = "service";
-	String XML_SYSTEMS = "systems";
-	String XML_Identify = "Identify";
-	String XML_S = "S";
 
 	/**
 	 * 截取 12,3 double类型的数字
@@ -64,8 +54,10 @@ public interface Constants {
 
 	String SHEET_APP_HEAD = "APP_HEAD";
 
+	String SHEET_SYSTEM = "消费者接入端口分配";
+
 	/**
-	 * xml中的节点属性字段
+	 * xml中的属性字段
 	 */
 	String NODE_TYPE = "type";
 	String NODE_LENGTH = "length";
@@ -84,11 +76,9 @@ public interface Constants {
 	String NODE_STORE_MODE_VALUE = "UTF-8";
 
 	/**
-	 * xml中root节点名称
+	 * xml中的节点名称
 	 */
-	String ROOT_METADATA = "metadata";
+	String XML_ARRAY = "array";
 
-	String SYS_HEAD = "SYS_HEAD";
-	String APP_HEAD = "APP_HEAD";
 
 }

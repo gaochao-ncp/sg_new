@@ -1,16 +1,14 @@
-package com.dc.xml.core;
+package com.dc.xml;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
-import com.dc.common.CommonUtil;
 import com.dc.common.Constants;
+import com.dc.config.HrSystem;
 import com.dc.excel.ExcelRow;
 import com.dc.excel.ExcelSheet;
-import com.dc.xml.XMLObject;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,9 +43,9 @@ public class XmlObject {
   private boolean rootElement = false;
 
   /**
-   * //todo 是否注释节点.先保留 后续进行优化注释行
+   * 注释节点.
    */
-  private boolean noteElement = false;
+  private List<XmlContext> contexts;
 
   /**
    * 标签名
@@ -57,7 +55,7 @@ public class XmlObject {
   /**
    * 绝对路径，Xpath操作的时候需要用到.root节点不需要
    */
-  private String path;
+  private String Xpath;
 
   /**
    * 服务编码，生成文件名
@@ -65,9 +63,9 @@ public class XmlObject {
   private String serviceCode;
 
   /**
-   * 系统英文代码，生成文件名字
+   * 系统渠道信息
    */
-  private String systemEng;
+  private HrSystem system;
 
   /**
    * xml文件类型
@@ -88,26 +86,26 @@ public class XmlObject {
 
   /**
    * 构建XML对象
-   *
+   * @param Xpath xpath对应的节点路径
    * @param tagName 标签名
    */
-  public XmlObject(String tagName,String path) {
+  public XmlObject(String tagName,String Xpath) {
     super();
     this.tagName = tagName;
-    this.path = path;
+    this.Xpath = Xpath;
   }
 
   /**
    * 构建XML对象
-   *
+   * @param Xpath xpath对应的节点路径
    * @param tagName 标签名
    * @param content 标签体
    * @param attrs   标签属性表
    */
-  public XmlObject(String tagName, String path,String content, Map<String, String> attrs) {
+  public XmlObject(String tagName, String Xpath,String content, Map<String, String> attrs) {
     super();
     this.tagName = tagName;
-    this.path = path;
+    this.Xpath = Xpath;
     this.content = content;
     this.attrs = attrs;
   }
@@ -123,8 +121,8 @@ public class XmlObject {
 
     //传入多个sheet页但是类型不为metadata的时候报错
     if (sheets.length > 1 && !XmlType.METADATA.equals(xmlType)){
-      log.warn("生成类型请修改为metadata");
-      return null;
+      log.warn("当解析多个sheet时，请将参数设置为 XmlType.METADATA");
+      return result;
     }
 
     //后续处理要用到这个属性，所以前置赋值
@@ -144,7 +142,6 @@ public class XmlObject {
       result.setChildTags(sysHead.getOutRows(),Constants.OUT);
       result.setChildTags(sysHead.getInRows(),Constants.IN);
     }
-
 
     //给service节点添加属性
     if (XmlType.SERVICE.equals(xmlType)){
@@ -169,7 +166,7 @@ public class XmlObject {
   }
 
   /**
-   * 设置子节点，并且给子节点属性赋值
+   * 处理子节点信息。并且给子节点属性赋值
    * @param rows
    * @param nodeType in节点；out节点
    */
@@ -180,7 +177,7 @@ public class XmlObject {
       String rootPath = getRootPath(row.getPath(),nodeType);
       //创建新节点加入
       XmlObject node;
-      if ("array".equals(row.getType())){
+      if (Constants.XML_ARRAY.equals(row.getType())){
         //type节点做特殊处理
         node = XpathParser.createNode(row.getTagName(), rootPath+"array", null, null);
         node.setAttrs("type","array");
@@ -194,6 +191,12 @@ public class XmlObject {
     getChildTags().put(nodeType,list);
   }
 
+  /**
+   * 处理路径信息，将路径信息转换为Xpath所需要的格式
+   * @param path
+   * @param nodeType
+   * @return
+   */
   private String getRootPath(String path,String nodeType){
     String rootPath = "";
     if (XmlType.METADATA.equals(this.xmlType)){
@@ -201,7 +204,7 @@ public class XmlObject {
     }else if (XmlType.SERVICE.equals(this.xmlType)) {
       rootPath = "/"+path;
     }else if (XmlType.SYSTEM_IDENTIFY.equals(this.xmlType)){
-      //TODO 后续做
+
     }else if (XmlType.SERVICE_IDENTIFY.equals(this.xmlType)){
 
     }else if (XmlType.SERVICE_DEFINITION.equals(this.xmlType)){
@@ -211,15 +214,18 @@ public class XmlObject {
       if (verifyArray(rootPath)){
         rootPath += "sdo";
       }
-
     }
     return rootPath;
   }
 
+  /**
+   *
+   * @param path
+   * @return
+   */
   public boolean verifyArray(String path){
     String[] split = path.split("\\/");
-
-    if ("array".equals(split[split.length-2])){
+    if (Constants.XML_ARRAY.equals(split[split.length-2])){
       return true;
     }
     return false;
@@ -317,12 +323,12 @@ public class XmlObject {
     this.rootElement = rootElement;
   }
 
-  public boolean isNoteElement() {
-    return noteElement;
+  public List<XmlContext> getContexts() {
+    return contexts;
   }
 
-  public void setNoteElement(boolean noteElement) {
-    this.noteElement = noteElement;
+  public void setContexts(List<XmlContext> contexts) {
+    this.contexts = contexts;
   }
 
   public String getTagName() {
@@ -349,12 +355,12 @@ public class XmlObject {
     setTagName(tagName);
   }
 
-  public String getPath() {
-    return path;
+  public String getXpath() {
+    return Xpath;
   }
 
-  public void setPath(String path) {
-    this.path = path;
+  public void setXpath(String xpath) {
+    Xpath = xpath;
   }
 
   public String getServiceCode() {
@@ -365,12 +371,12 @@ public class XmlObject {
     this.serviceCode = serviceCode;
   }
 
-  public String getSystemEng() {
-    return systemEng;
+  public HrSystem getSystem() {
+    return system;
   }
 
-  public void setSystemEng(String systemEng) {
-    this.systemEng = systemEng;
+  public void setSystem(HrSystem system) {
+    this.system = system;
   }
 
   public XmlType getXmlType() {
@@ -380,4 +386,5 @@ public class XmlObject {
   public void setXmlType(XmlType xmlType) {
     this.xmlType = xmlType;
   }
+
 }

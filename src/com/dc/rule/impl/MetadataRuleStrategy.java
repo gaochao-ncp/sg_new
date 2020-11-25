@@ -1,39 +1,55 @@
-package com.dc.xml;
+package com.dc.rule.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.XmlUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import com.dc.common.Constants;
-import com.dc.config.SgConfig;
-import com.dc.unpack.metadata.MetadataNode;
+import com.dc.config.HrConfig;
+import com.dc.core.MetadataNode;
+import com.dc.rule.BaseRule;
+import com.dc.rule.RuleStrategy;
 import org.w3c.dom.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * metadata.xml文件解析和生成器
+ * metadata.xml规则类
+ *
  * @author: Administrator
- * @date: 2020-11-20 15:50
+ * @date: 2020-11-23 16:15
  * @version: 1.0
  */
-public class MetadataXmlParse {
+public class MetadataRuleStrategy implements RuleStrategy {
 
-  private static final Log log = LogFactory.get(MetadataXmlParse.class);
+  private static final Log log = LogFactory.get(MetadataRuleStrategy.class);
+
+  @Override
+  public boolean preCheckRule(BaseRule baseRule) {
+    parseMetadataXml();
+    return true;
+  }
+
+
+  @Override
+  public boolean postCheckRule(BaseRule baseRule) {
+    return false;
+  }
 
   /**
    * 对比in端metadata和out端metadata文件的不同
-   * @param inPath in端路径
-   * @param outPath out端路径
    */
-  public void parseMetadataXml(String inPath,String outPath){
+  private void parseMetadataXml(){
 
-    if (inPath.contains(SgConfig.getConfig().getLocalInHome())){
+    String inPath = HrConfig.getConfig().LOCAL_URL.get(Constants.IN);
+    String outPath = HrConfig.getConfig().LOCAL_URL.get(Constants.OUT);
+
+    if (inPath.contains(HrConfig.getConfig().getLocalInHome())){
       log.info("in端路径:"+inPath);
     }
 
-    if (outPath.contains(SgConfig.getConfig().getLocalOutHome())){
+    if (outPath.contains(HrConfig.getConfig().getLocalOutHome())){
       log.info("out端路径:"+outPath);
     }
 
@@ -118,13 +134,5 @@ public class MetadataXmlParse {
       }
     }
     return mapping;
-  }
-
-  /**
-   * TODO 获得服务器上的metadata.xml文件信息
-   * @return
-   */
-  public Document getMetadataXmlServer(){
-    return XmlUtil.createXml();
   }
 }

@@ -1,10 +1,11 @@
-package com.dc.xml;
+package com.dc.xml.deprecated;
 
 /**
  * {@link XMLObject}格式化接口
  *
  * @author Huang.Yong
  */
+@Deprecated
 public interface XMLObjectFormatter {
 
     /**

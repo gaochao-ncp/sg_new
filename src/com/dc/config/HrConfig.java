@@ -4,8 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import com.dc.common.Constants;
-import com.sun.org.slf4j.internal.Logger;
-import com.sun.org.slf4j.internal.LoggerFactory;
+import com.dc.excel.ExcelParse;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -14,49 +13,51 @@ import java.io.InputStreamReader;
 import java.util.*;
 
 /**
- * config目录下的配置文件
+ * 读取配置文件
  * @author: Administrator
  * @date: 2020-11-17 10:20
  * @version: 1.0
  */
-public class SgConfig {
+public class HrConfig {
 
-  private static final Log log = LogFactory.get(SgConfig.class);
+  private static final Log log = LogFactory.get(HrConfig.class);
 
+  /** 服务器信息 **/
   private String sshIp;
   private String sshUser;
   private String sshPwd;
 
+  /** 服务器远程路径 **/
   private String remoteEsbHome;
   private String remoteInHome;
   private String remoteOutHome;
   private String remoteMetadataHome;
   private String remoteServiceIdentifyHome;
 
+  /** 本地路径 **/
   private String localEsbHome;
   private String localInHome;
   private String localOutHome;
   private String localMetadataHome;
   private String localServiceIdentifyHome;
 
-  private Map<String, String> systemMappings = new HashMap<>();
-
   private String filteredChannels;
-
   private String filteredServices;
 
-  private Map<String, List<String>> excelServices = new HashMap<>();
+  public Map<String, HrSystem> systemMappings = new HashMap<>();
 
-  public Map<String, String> remoteUrl = new HashMap<>();
+  public Map<String, List<String>> excelServices = new HashMap<>();
 
-  public Map<String, String> localUrl = new HashMap<>();
+  public Map<String, String> REMOTE_URL = new HashMap<>();
 
-  public SgConfig(){
+  public Map<String, String> LOCAL_URL = new HashMap<>();
+
+  public HrConfig(){
     init();
   }
 
-  public static SgConfig getConfig(){
-    SgConfig config = new SgConfig();
+  public static HrConfig getConfig(){
+    HrConfig config = new HrConfig();
     config.init();
     return config;
   }
@@ -84,17 +85,22 @@ public class SgConfig {
     this.localMetadataHome = prop.getProperty("local.metadata.home");
     this.localServiceIdentifyHome = prop.getProperty("local.serviceIdentify.home");
 
-    String systemMappingStr = prop.getProperty("system.mappings");
-    if (StrUtil.isNotBlank(systemMappingStr)){
-      String[] systemMappingStrs = systemMappingStr.split("\\;");
-      for (String mappingStr : systemMappingStrs) {
-        String[] mapping = mappingStr.split("\\:");
-        systemMappings.put(mapping[0],mapping[1]);
+    String localSystemMapping = prop.getProperty("local.excel.system.mappings");
+    if (StrUtil.isNotBlank(localSystemMapping)){
+      //将本地的常量表解析进来
+     this.systemMappings = ExcelParse.parseSystemMapping(localSystemMapping);
+    }else {
+      String systemMappingStr = prop.getProperty("system.mappings");
+      if (StrUtil.isNotBlank(systemMappingStr)){
+        String[] systemMappingStrs = systemMappingStr.split("\\;");
+        for (String mappingStr : systemMappingStrs) {
+          String[] mapping = mappingStr.split("\\:");
+          systemMappings.put(mapping[0],new HrSystem(mapping[0],mapping[1],null));
+        }
       }
     }
 
     this.filteredChannels = prop.getProperty("filtered.channels");
-
     this.filteredServices = prop.getProperty("filtered.services");
 
     String localExcelServicesStr = prop.getProperty("local.excel.services");
@@ -109,15 +115,18 @@ public class SgConfig {
     }
 
     //初始化远程路径
-    remoteUrl.put(Constants.IN,this.remoteEsbHome+this.remoteInHome+this.remoteMetadataHome);
-    remoteUrl.put(Constants.OUT,this.getRemoteEsbHome()+this.getRemoteOutHome()+this.getRemoteMetadataHome());
+    REMOTE_URL.put(Constants.IN,this.remoteEsbHome+this.remoteInHome+this.remoteMetadataHome);
+    REMOTE_URL.put(Constants.OUT,this.getRemoteEsbHome()+this.getRemoteOutHome()+this.getRemoteMetadataHome());
 
     //初始化本地路径
-    localUrl.put(Constants.IN,this.getLocalEsbHome()+this.getLocalInHome()+this.getLocalMetadataHome());
-    localUrl.put(Constants.OUT,this.getLocalEsbHome()+this.getLocalOutHome()+this.getLocalMetadataHome());
-
+    LOCAL_URL.put(Constants.IN,this.getLocalEsbHome()+this.getLocalInHome()+this.getLocalMetadataHome());
+    LOCAL_URL.put(Constants.OUT,this.getLocalEsbHome()+this.getLocalOutHome()+this.getLocalMetadataHome());
   }
 
+  /**
+   * 初始化配置文件
+   * @return Properties
+   */
   private Properties initProperties(){
     Properties props = new Properties();
     String configPath = System.getProperty("user.dir") + "/config/config.properties";
@@ -181,10 +190,6 @@ public class SgConfig {
     return localServiceIdentifyHome;
   }
 
-  public Map<String, String> getSystemMappings() {
-    return systemMappings;
-  }
-
   public String getFilteredChannels() {
     return filteredChannels;
   }
@@ -192,9 +197,4 @@ public class SgConfig {
   public String getFilteredServices() {
     return filteredServices;
   }
-
-  public Map<String, List<String>> getExcelServices() {
-    return excelServices;
-  }
-
 }

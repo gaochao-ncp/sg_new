@@ -1,9 +1,10 @@
 package com.dc;
 
-import com.dc.common.Constants;
-import com.dc.config.SgConfig;
+import com.dc.config.HrConfig;
+import com.dc.rule.BaseRule;
+import com.dc.rule.RuleStrategy;
+import com.dc.rule.impl.MetadataRuleStrategy;
 import com.dc.sftp.SshUtil;
-import com.dc.xml.MetadataXmlParse;
 
 /**
  * 工具启动类
@@ -14,13 +15,18 @@ import com.dc.xml.MetadataXmlParse;
  */
 public class Start {
 
+  /**
+   * 配置文件信息
+   */
+  HrConfig config = HrConfig.getConfig();
+
   public static void main(String[] args) {
     // 1.下载in/out端metadata.xml
     SshUtil.download();
 
     // 2.解析in和out端metadata.xml
-    MetadataXmlParse metadataXmlParse = new MetadataXmlParse();
-    metadataXmlParse.parseMetadataXml(SgConfig.getConfig().localUrl.get(Constants.IN),SgConfig.getConfig().localUrl.get(Constants.OUT));
+    RuleStrategy metadataRuleStrategy = new MetadataRuleStrategy();
+    metadataRuleStrategy.preCheckRule(new BaseRule());
 
     // 3.将excel中sys_head、app_head、local_head、business_service的字段与metadata.xml中的进行比较
 

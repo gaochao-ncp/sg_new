@@ -1,4 +1,4 @@
-package com.dc.unpack.metadata;
+package com.dc.core;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.log.Log;
@@ -7,7 +7,6 @@ import com.dc.common.Constants;
 
 /**
  * metadata中的节点信息
- *
  * @author: Administrator
  * @date: 2020-11-17 22:57
  * @version: 1.0
@@ -79,7 +78,6 @@ public class MetadataNode {
     if (StrUtil.isBlank(v1) && StrUtil.isBlank(v2)){
       return "";
     }
-
     if (!v1.equals(v2)){
       return "节点"+node+"值不同[out端:"+v1+",in端:"+v2+"] ";
     }
