@@ -1,35 +1,17 @@
 package com.dc.common;
 
-import com.dc.xml.XmlObject;
 import com.dc.xml.XmlType;
 
-import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * 常量类
+ * @author: Administrator
+ * @date: 2020-11-17 10:20
+ * @version: 1.0
+ */
 public interface Constants {
-
-	// 远程ESB主目录
-	//public static final String remoteEsbHome = ConfigUtil.getProp("remote.esb.home");
-	// 本地ESB主目录
-	public static final String localEsbHome = System.getProperty("user.dir") + "/SmartESB/";
-	public static final String inMetadataHome = "configs/in_conf/metadata/";
-	public static final String outMetadataHome = "configs/out_conf/metadata/";
-	// in端metadata.xml路径
-//	public static final String inMetadataPath = inMetadataHome + "metadata.xml";
-	// out端metadata.xml路径
-//	public static final String outMetadataPath = outMetadataHome + "metadata.xml";
-	//public static final String remoteInMetadataPath = remoteEsbHome + "configs/in_conf/metadata/metadata.xml";
-
-	//public static final String remoteOutMetadataPath = remoteEsbHome + "configs/out_conf/metadata/metadata.xml";
-	public static final String localInMetadataPath = localEsbHome + "configs/in_conf/metadata/metadata.xml";
-	public static final String localOutMetadataPath = localEsbHome + "configs/out_conf/metadata/metadata.xml";
-	public static final String localInMetadataHome = localEsbHome + inMetadataHome;
-	public static final String localOutMetadataHome = localEsbHome + outMetadataHome;
-	public static final String localInServiceIdentifyHome = new File(localInMetadataHome).getParent() + "/";
-	public static final String localOutSystemIdentifyHome = new File(localOutMetadataHome).getParent() + "/";
-
-	public static final String localTestPath = localEsbHome + "test/";
 
 	/**
 	 * 要生成的文件类型
@@ -45,9 +27,30 @@ public interface Constants {
 
 	String OUT_CN = "输出";
 
+	/**
+	 * 含义：输入字段；in端
+	 */
 	String IN = "IN";
 
+	/**
+	 * 含义：输出字段；out端
+	 */
 	String OUT = "OUT";
+
+	/**
+	 * 全部字段
+	 */
+	String ALL = "ALL";
+
+	/**
+	 * in端服务识别路径
+	 */
+	String IN_SERVICE_IDENTIFY = "in_service_identify";
+
+	/**
+	 * out端系统识别路径
+	 */
+	String OUT_SYSTEM_IDENTIFY = "out_system_identify";
 
 	String UAT_CLIENT = "UAT";
 
@@ -59,9 +62,13 @@ public interface Constants {
 
 	String SHEET_COMMON = "常量对照表";
 
+	String SHEET_DATA = "数据字典";
+
 	String SHEET_SYS_HEAD = "SYS_HEAD";
 
 	String SHEET_APP_HEAD = "APP_HEAD";
+
+	String SHEET_COMMON_FILED = "公共字段";
 
 	String SHEET_SYSTEM = "消费者接入端口分配";
 
@@ -89,5 +96,15 @@ public interface Constants {
 	 */
 	String XML_ARRAY = "array";
 
+	/**
+	 * 消费渠道和服务系统标识
+	 */
+	String CONSUMER_CHANNEL = "consumer_channel";
+	String PROVIDER_SYSTEM = "provider_system";
+
+
+	int M = 13;
+	int G = 7;
+	int H = 8;
 
 }

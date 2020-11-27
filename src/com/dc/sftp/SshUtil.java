@@ -1,6 +1,7 @@
 package com.dc.sftp;
 
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.ssh.Sftp;
 import cn.hutool.log.Log;
@@ -32,7 +33,7 @@ public class SshUtil {
 	 * 下载全部Metadata.xml
 	 */
 	public static void download(){
-		if (config.LOCAL_URL != null && config.LOCAL_URL.size()>0){
+		if (MapUtil.isNotEmpty(config.LOCAL_URL)){
 			for (Map.Entry<String, String> entry : config.LOCAL_URL.entrySet()) {
 				String local = entry.getValue();
 				String remoteType = entry.getKey();

@@ -1,8 +1,5 @@
 package com.dc.excel;
 
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-
 import java.util.List;
 
 /**
@@ -15,11 +12,6 @@ import java.util.List;
 public class ExcelSheet {
 
   private String sheetName;
-
-  /**
-   * 预留,防止以后用到
-   */
-  private Workbook workbook;
 
   /**
    * 输入字段
@@ -47,6 +39,11 @@ public class ExcelSheet {
   private ExcelSheet appHead;
 
   /**
+   * 公共部分 公共字段
+   */
+  private ExcelSheet common;
+
+  /**
    * 是否解析标志
    */
   private boolean parseFlag = false;
@@ -57,14 +54,6 @@ public class ExcelSheet {
 
   public void setSheetName(String sheetName) {
     this.sheetName = sheetName;
-  }
-
-  public Workbook getWorkbook() {
-    return workbook;
-  }
-
-  public void setWorkbook(Workbook workbook) {
-    this.workbook = workbook;
   }
 
   public List<ExcelRow> getInRows() {
@@ -113,5 +102,13 @@ public class ExcelSheet {
 
   public void setAppHead(ExcelSheet appHead) {
     this.appHead = appHead;
+  }
+
+  public ExcelSheet getCommon() {
+    return common;
+  }
+
+  public void setCommon(ExcelSheet common) {
+    this.common = common;
   }
 }

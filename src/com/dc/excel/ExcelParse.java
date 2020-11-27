@@ -1,28 +1,18 @@
 package com.dc.excel;
 
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
-import cn.hutool.poi.excel.ExcelReader;
-import cn.hutool.poi.excel.ExcelUtil;
-import cn.hutool.poi.excel.WorkbookUtil;
 import com.dc.common.CommonUtil;
 import com.dc.common.Constants;
-import com.dc.config.HrConfig;
 import com.dc.config.HrSystem;
-import org.apache.poi.hssf.usermodel.HSSFFont;
-import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -36,23 +26,7 @@ public class ExcelParse {
 
   private static final Log log = LogFactory.get(ExcelParse.class);
 
-  /**
-   * 根据sheet页名称获取 {@link ExcelReader 对象}
-   * @param absolutePath
-   * @return
-   */
-  public ExcelReader getExcelReader(String absolutePath,String sheetName){
-    return ExcelUtil.getReader(FileUtil.file(absolutePath),sheetName);
-  }
 
-  /**
-   * 默认获取excel首个sheet页的ExcelReader对象
-   * @param absolutePath
-   * @return
-   */
-  public ExcelReader getExcelReader(String absolutePath){
-    return ExcelUtil.getReader(FileUtil.file(absolutePath));
-  }
 
   /**
    * 解析Excel的全部sheet数据
@@ -62,110 +36,123 @@ public class ExcelParse {
   public ExcelAll parseExcel(String absolutePath){
     ExcelAll excelAll = new ExcelAll();
     List<ExcelSheet> all = excelAll.getList();
-    ExcelReader excelReader = getExcelReader(absolutePath);
-    if (excelReader == null){
+    Workbook wb = ExcelUtil.readExcel(absolutePath);
+    if (ObjectUtil.isNull(wb)){
       return excelAll;
     }
-    //获取所有索引页
-    List<String> sheetNames = excelReader.getSheetNames();
-    //修订记录不需要解析
-    sheetNames.stream().skip(1).forEach(sheetName -> {
-      all.add(parseExcel(absolutePath,sheetName));
-    });
+
+    //获取所有sheet页
+    Iterator<Sheet> sheets = wb.sheetIterator();
+
+    while (sheets.hasNext()){
+      Sheet next = sheets.next();
+      if (CommonUtil.filteredSheet(next.getSheetName())){
+        continue;
+      }
+      if (CommonUtil.filteredCommonSheet(next.getSheetName())){
+        continue;
+      }
+      ExcelSheet sheet = parseExcel(absolutePath, next.getSheetName());
+      all.add(sheet);
+    }
     return excelAll;
   }
 
   /**
-   * 解析指定sheet页的数据
+   * 解析整个工作簿:不包括工作簿中的公共部分：见{@link CommonUtil#filteredCommonSheet(String)}
    * @param absolutePath
-   * @param sheetName
+   * @param sheetNames
+   * @return
+   */
+  public List<ExcelSheet> parseExcel(String absolutePath, List<String> sheetNames){
+    List<ExcelSheet> sheets = new ArrayList<>();
+    if (CollUtil.isNotEmpty(sheetNames)){
+      sheetNames.stream().forEach(sheetName -> {
+        if (Constants.ALL.equals(sheetName)){
+          //配置信息中配置ALL的话表示该文档的所有sheet页都需要解析
+          ExcelAll excelAll = parseExcel(absolutePath);
+          sheets.addAll(excelAll.getList());
+        }else {
+          ExcelSheet sheet = parseExcel(absolutePath, sheetName);
+          if (ObjectUtil.isNotNull(sheet)){
+            sheets.add(sheet);
+          }
+        }
+      });
+    }
+    return  sheets;
+  }
+
+  /**
+   * 解析工作簿指定sheet页的数据。
+   * @param absolutePath word文档的绝对路径，不然无法解析
+   * @param sheetName 要解析的sheet页的名字
    */
   public ExcelSheet parseExcel(String absolutePath, String sheetName){
-    if (CommonUtil.verifySheetName(sheetName)){
-      throw new RuntimeException(sheetName+" 无法解析");
+    if (CommonUtil.filteredCommonSheet(sheetName)){
+      return null;
     }
     //解析表格
-    ExcelSheet sheet = parseExcelSheet(getExcelReader(absolutePath,sheetName));
+    ExcelSheet sheet = parseExcelSheet(ExcelUtil.readExcel(absolutePath,sheetName));
     //解析公共部分
-    sheet.setAppHead(parseExcelSheet(getExcelReader(absolutePath,Constants.SHEET_APP_HEAD)));
-    sheet.setSysHead(parseExcelSheet(getExcelReader(absolutePath,Constants.SHEET_SYS_HEAD)));
+    sheet.setAppHead(parseExcelSheet(ExcelUtil.readExcel(absolutePath,Constants.SHEET_APP_HEAD)));
+    sheet.setSysHead(parseExcelSheet(ExcelUtil.readExcel(absolutePath,Constants.SHEET_SYS_HEAD)));
+    sheet.setCommon(parseExcelSheet(ExcelUtil.readExcel(absolutePath,Constants.SHEET_COMMON_FILED)));
     //解析索引页数据信息
-    sheet.setIndex(parseIndex(getExcelReader(absolutePath,Constants.SHEET_INDEX),sheetName));
+    sheet.setIndex(parseIndex(ExcelUtil.readExcel(absolutePath,Constants.SHEET_INDEX),sheetName));
+
     //标志为已解析
     sheet.setParseFlag(true);
     return sheet;
   }
 
   /**
-   * 解析表格
-   * @param excelReader
+   * 解析工作表
+   * @param sheetBean
    * @return
    */
-  private ExcelSheet parseExcelSheet(ExcelReader excelReader){
+  private ExcelSheet parseExcelSheet(Sheet sheetBean){
     ExcelSheet sheet = new ExcelSheet();
 
-    if (excelReader == null){
+    if (ObjectUtil.isNull(sheetBean)){
       log.warn("解析表格为空，请核实！");
       return sheet;
     }
 
-    String sheetName = excelReader.getSheet().getSheetName();
-    //常量对照表和索引页目前不解析
-    if (Constants.SHEET_COMMON.equals(sheetName)
-            || Constants.SHEET_INDEX.equals(sheetName)){
+    String sheetName = sheetBean.getSheetName();
+    //常量对照表和索引页还有修订记录目前不支持解析
+    if (CommonUtil.filteredSheet(sheetName)){
       return sheet;
     }
 
     sheet.setSheetName(sheetName);
-    sheet.setWorkbook(excelReader.getWorkbook());
 
-    HSSFWorkbook workbook = (HSSFWorkbook) excelReader.getWorkbook();
-
-    int fontIndexAsInt = excelReader.getCell("H9").getCellStyle().getFontIndex();
-    HSSFFont fontAt = workbook.getFontAt(fontIndexAsInt);
-    System.out.println("fontAt.getStrikeout() = " + fontAt.getStrikeout());
-
-    //处理其他的sheet页面,从G行开始读取,输出行默认是第7列开始
-    //计算输入字段和输出字段的位置,非索引页的处理逻辑
-    int rowCount = excelReader.getRowCount();
-    int inStart = 0,inEnd=0,outStart = 0;
-    for (int i = 0; i < rowCount; i++) {
-      //读取7:G列数据
-      String cellValue = (String) excelReader.readCellValue(6, i);
-      if (Constants.IN_CN.equals(cellValue)){
-        //不包括输入行
-        inStart = i+1;
-      }else if (Constants.OUT_CN.equals(cellValue)){
-        outStart = i+1;
-        inEnd = i-1;
-      }
-    }
-
-    List<List<Object>> inRowValue = excelReader.read(inStart,inEnd);
-    List<List<Object>> outRowValue = excelReader.read(outStart);
+    List<Row> read = ExcelUtil.readRow(sheetBean, 7);
+    List<ExcelRow> inRowValue = ExcelUtil.readInRow(read);
+    List<ExcelRow> outRowValue = ExcelUtil.readOutRow(read);
 
     if (CollUtil.isNotEmpty(inRowValue)){
-      sheet.setInRows(parseExcelRow(inRowValue));
+      sheet.setInRows(inRowValue);
     }
 
     if (CollUtil.isNotEmpty(outRowValue)){
-      sheet.setOutRows(parseExcelRow(outRowValue));
+      sheet.setOutRows(outRowValue);
     }
+    sheet.setParseFlag(true);
     return sheet;
   }
 
   /**
-   * 解析 索引 页的数据
-   * @param excelReader
+   * 解析索引页的数据:从索引页中找到对应的那条信息
+   * @param sheet
    * @return
    */
-  public ExcelIndex parseIndex(ExcelReader excelReader,String sheetName){
+  public ExcelIndex parseIndex(Sheet sheet,String sheetName){
     ExcelIndex index = new ExcelIndex();
     //索引页直接解析
-    List<List<Object>> allRow = excelReader.read();
+    List<List<String>> allRow = ExcelUtil.read(sheet);
     //索引页第一行标题,截取0-11列的数据,因为存在很多脏数据
-    for (List<Object> row : allRow) {
-      List<String> rowValue = row.stream().map(o -> String.valueOf(o)).collect(Collectors.toList());
+    for (List<String> rowValue : allRow) {
       //找到对应当前excel的那一列数据
       if (sheetName.equals(rowValue.get(4))){
         index.setTradeCode(rowValue.get(0));
@@ -187,7 +174,7 @@ public class ExcelParse {
    * @param rows 多行数据
    * @return
    */
-  private List<ExcelRow> parseExcelRow(List<List<Object>> rows){
+  private List<ExcelRow> parseExcelRow(List<List<String>> rows){
     List<ExcelRow> rowList = new ArrayList<>();
     rows.stream().forEach(row -> {
       rowList.add(doParseExcelRow(row));
@@ -200,15 +187,15 @@ public class ExcelParse {
    * @param row
    * @return
    */
-  private ExcelRow doParseExcelRow(List<Object> row){
+  private ExcelRow doParseExcelRow(List<String> row){
     ExcelRow result = new ExcelRow();
     //截取row中7:G列之后的数据
-    List<String> rowValue = row.stream().skip(7).map(o -> String.valueOf(o)).collect(Collectors.toList());
+    List<String> rowValue = row.stream().skip(7).collect(Collectors.toList());
     result.setTagName(rowValue.get(0));
     String type = rowValue.get(1).replaceAll("[^a-zA-Z]", "").toLowerCase();
     result.setType(type);
     if (double.class.getName().equals(type)){
-      String[] value = parseDouble(rowValue.get(1));
+      String[] value = ExcelUtil.parseDouble(rowValue.get(1));
       result.setLength(value[0]);
       result.setScale(value[1]);
     }else {
@@ -220,43 +207,26 @@ public class ExcelParse {
   }
 
   /**
-   * 解析type为double时候的length和scale字段
-   * @param value
-   * @return
-   */
-  private String[] parseDouble(String value){
-    String[] split = new String[2];
-    Pattern p = Pattern.compile(Constants.REGEX);
-    Matcher matcher = p.matcher(value);
-    if (matcher.find()){
-      split = matcher.group(0).split(",");
-    }
-    return split;
-  }
-
-  /**
    * 解析消费者系统英文名和中文名的映射关系
    * @param absolutePath
    * @return
    */
   public static Map<String, HrSystem> parseSystemMapping(String absolutePath){
     //Constants.SHEET_SYSTEM
-    ExcelReader reader = ExcelUtil.getReader(new File(absolutePath), Constants.SHEET_SYSTEM);
+    Sheet s = ExcelUtil.readExcel(absolutePath, Constants.SHEET_SYSTEM);
     Map<String, HrSystem> map = new HashMap<>(99);
-    if (reader != null){
-      //读取所有的行信息
-      List<List<Object>> rows = reader.read();
-      //忽略前面两行无用
-      List<List<Object>> collect = rows.stream().skip(2).collect(Collectors.toList());
-      collect.stream().forEach(row -> {
+    if (ObjectUtil.isNotNull(s)){
+      //忽略前面两行无用的行信息
+      List<List<String>> rows = ExcelUtil.read(s,2,s.getLastRowNum());
+      rows.stream().forEach(row -> {
         //只取前三行的数据
-        List<String> system = row.stream().limit(3).map(o -> String.valueOf(o)).collect(Collectors.toList());
-        HrSystem info = new HrSystem(system.get(0).trim(),system.get(1).trim(),Integer.valueOf(system.get(2).trim()));
-        map.put(system.get(0),info);
+        HrSystem info = new HrSystem(row.get(0).trim(),row.get(1).trim(),Integer.valueOf(row.get(2).trim()));
+        map.put(row.get(0),info);
       });
     }
     return map;
   }
+
 
 
 }

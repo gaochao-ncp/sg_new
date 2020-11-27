@@ -1,8 +1,9 @@
 package com.dc.xml;
 
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.map.MapUtil;
+import cn.hutool.core.util.ObjectUtil;
+import com.dc.common.CommonUtil;
 import com.dc.common.Constants;
 import com.dc.config.HrSystem;
 import com.dc.core.MetadataNode;
@@ -29,7 +30,7 @@ public class XmlMetadata {
   private List<XmlObject> xmlObjectList ;
 
   /**
-   * 系统和服务码映射：key：系统代码 ；value：服务码列表
+   * 系统和服务码映射：key：系统代码 ；value：服务码列表。目的是用来生成服务识别和系统识别文件
    */
   private Map<String,List<String>> serviceCodeMapping ;
 
@@ -44,18 +45,44 @@ public class XmlMetadata {
   }
 
   /**
+   * 添加注释节点信息
+   * @param last 结束语
+   */
+  public void addCommentNode(String last){
+    String comment = CommonUtil.getDefaultComment(last);
+    MetadataNode commentNode = new MetadataNode();
+    commentNode.setCommentFlag(true);
+    commentNode.setComment(comment);
+    getMetadataNodeList().add(commentNode);
+    XmlObject xmlObject = new XmlObject();
+    xmlObject.setCommentFlag(true);
+    xmlObject.setComment(comment);
+    xmlObject.setRootElement(true);
+    getXmlObjectList().add(xmlObject);
+  }
+
+  /**
    * 解析系统和服务码
    * @param system
    * @param serviceCode
    */
-  private void parseSystemInfo(List<HrSystem> system,String serviceCode){
-    if (CollUtil.isNotEmpty(system)){
-      system.stream().forEach(s -> {
-        List<String> codeList = getServiceCodeMapping().get(s.getCode());
-        if (CollUtil.isEmpty(codeList)){
-          getServiceCodeMapping().put(s.getCode(), ListUtil.toList(serviceCode));
-        }
-      });
+  private void parseSystemInfo(Map<String,HrSystem> system,String serviceCode){
+    if (MapUtil.isNotEmpty(system)){
+      parseSystemInfo(system.get(Constants.CONSUMER_CHANNEL),serviceCode);
+      parseSystemInfo(system.get(Constants.PROVIDER_SYSTEM),serviceCode);
+    }
+  }
+
+  private void parseSystemInfo(HrSystem system,String serviceCode){
+    if (ObjectUtil.isNotNull(system)){
+      List<String> codeList = getServiceCodeMapping().get(system.getCode());
+      if (CollUtil.isEmpty(codeList)){
+        List<String> list = new ArrayList<>();
+        list.add(serviceCode);
+        getServiceCodeMapping().put(system.getCode(), list);
+      }else {
+        codeList.add(serviceCode);
+      }
     }
   }
 

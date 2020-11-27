@@ -7,7 +7,10 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 
+import com.dc.common.CommonUtil;
 import com.dc.common.Constants;
+import com.dc.config.HrConfig;
+import com.dc.config.HrSystem;
 import com.dc.core.MetadataNode;
 import org.dom4j.*;
 import org.dom4j.io.OutputFormat;
@@ -17,6 +20,7 @@ import org.dom4j.io.XMLWriter;
 import java.io.*;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Xml解析器
@@ -57,64 +61,111 @@ public class XpathParser {
    * 创建新标签
    * @param Xpath 解析路径
    * @param tagName 标签名
-   * @param content 标签体
-   * @param attrs   属性列表
+   * @param path 原路径
    * @return XMLObject 新节点对象
    */
-  public static XmlObject createNode(String tagName, String Xpath, String content, Map<String, String> attrs) {
-    XmlObject newNode = new XmlObject(tagName, Xpath, content, attrs);
+  public static XmlObject createNode(String tagName, String Xpath, String path) {
+    XmlObject newNode = new XmlObject(tagName, Xpath, path);
     return newNode;
   }
 
+  /**
+   * 批量处理服务信息
+   * 1.生成服务对应的document对象 2.输出到本地 。一体化操作。
+   * @param metadata
+   * @return
+   */
+  public static boolean ofTransferBatch(XmlMetadata metadata){
+    //处理元数据
+    if (!ObjectUtil.isNotEmpty(metadata)){
+      log.warn("元数据metadata为空，处理失败！");
+      return false;
+    }
+
+    Set<MetadataNode> metadataNodeList = metadata.getMetadataNodeList();
+    if (ObjectUtil.isNotEmpty(metadataNodeList)){
+      Document metadataDocument = createMetadataDocument(metadataNodeList);
+      //输出到本地文件夹
+      transfer(HrConfig.getConfig().LOCAL_URL.get(Constants.IN)+"/metadata.xml", metadataDocument);
+      transfer(HrConfig.getConfig().LOCAL_URL.get(Constants.OUT)+"/metadata.xml", metadataDocument);
+    }
+
+    //处理拆组包文件
+    List<XmlObject> xmlObjectList = metadata.getXmlObjectList();
+    if (CollUtil.isNotEmpty(xmlObjectList)){
+      ofTransfer(xmlObjectList);
+    }
+
+    //处理系统识别和服务识别信息
+    Map<String, List<String>> serviceCodeMapping = metadata.getServiceCodeMapping();
+    if (MapUtil.isNotEmpty(serviceCodeMapping)){
+      //todo
+
+    }
+    return true;
+  }
+
+  public static boolean ofTransfer(List<XmlObject> xmlObjectList){
+    xmlObjectList.stream().forEach(xmlObject -> {
+      ofTransfer(xmlObject,false);
+    });
+    return true;
+  }
 
   /**
    * 直接将 XmlObject对象转换为文件输出
-   * 一个对象生成三种类型的文件:metadata 拆包（in|out） 组包（in|out）
+   * <p>
+   *   这个方法无法生成metadata.xml方法,将 metadataFlag 设置为true可以生成
+   * </p>
+   * @param metadataFlag 是否处理metadata.xml true 处理；false 不处理。目前处理方法还没写好
    * @param xmlObject
    * @return
    */
-  public static boolean ofTransfer(XmlObject xmlObject){
+  public static boolean ofTransfer(XmlObject xmlObject,boolean metadataFlag){
     Constants.XML_TYPE_LIST.stream().forEach(xmlType -> {
       //设置根节点名称
       xmlObject.setTagName(xmlType);
-      //根据XmlType决定对应的路径
+      //根据XmlType生成对应的Xpath
+      xmlObject.setChildXpath(xmlType);
+      //消费者系统
+      HrSystem consumer = xmlObject.getSystem().get(Constants.CONSUMER_CHANNEL);
+      //提供者系统
+      HrSystem provider = xmlObject.getSystem().get(Constants.PROVIDER_SYSTEM);
+      //根据XmlType决定对应的路径 从LOCAL_URL中获取
       String absolutePath = "";
       if (XmlType.METADATA.equals(xmlType)){
-
-
-        ofTransfer(absolutePath,xmlObject);
+        //在 ofTransferBatch 方法中已经处理了，这里不再进行处理
+        if (metadataFlag){
+          //todo 生成metadata.xml文件
+        }else {
+          return;
+        }
       }else if (XmlType.SERVICE.equals(xmlType)){
         //给 Service 节点设置属性
         xmlObject.setAttrs(Constants.NODE_PACKAGE_TYPE,Constants.NODE_PACKAGE_TYPE_VALUE);
         xmlObject.setAttrs(Constants.NODE_STORE_MODE,Constants.NODE_STORE_MODE_VALUE);
 
+        Document inDoc = createDom4j(Constants.IN, xmlObject);
+        //输入字段生成 in端的拆包和out端的组包文件
+        List<String> inFilePath = CommonUtil.generateFilePath(Constants.IN,consumer.getCode(),provider.getCode(),xmlObject.getServiceCode());
+        transfer(inFilePath,inDoc);
+
+        Document outDoc = createDom4j(Constants.OUT, xmlObject);
+        List<String> outFilePath = CommonUtil.generateFilePath(Constants.IN,consumer.getCode(),provider.getCode(),xmlObject.getServiceCode());
+        transfer(outFilePath,outDoc);
 
         //最后将设置的属性清空
         xmlObject.clearAttrs();
       }else if (XmlType.SERVICE_DEFINITION.equals(xmlType)){
-
+        Document allDoc = createDom4j(Constants.ALL, xmlObject);
+        List<String> allFilePath = CommonUtil.generateFilePath(Constants.ALL,"","",xmlObject.getServiceCode());
+        transfer(allFilePath,allDoc);
       }else {
         log.warn("没有找到对应的XmlType，无法生成对应的文件，请检查 Constants.XML_TYPE_LIST 是否配置正确");
+        return;
       }
     });
-
-
     return true;
-  }
-
-  /**
-   * 直接将 XmlObject对象转换为文件输出,此方法不暴露给外人调用，防止修改默认规则
-   * @param absolutePath 可以不指定，有默认的输出位置
-   * @param xmlObject xml对象
-   * @return
-   */
-  private static boolean ofTransfer(String absolutePath,XmlObject xmlObject){
-
-    if (StrUtil.isBlank(absolutePath)){
-
-    }
-
-    return transfer(absolutePath, createDom4j(xmlObject));
   }
 
   /**
@@ -122,13 +173,13 @@ public class XpathParser {
    * @param metadataNodes
    * @return
    */
-  public static Document createMetadataDocument(List<MetadataNode> metadataNodes){
+  public static Document createMetadataDocument(Set<MetadataNode> metadataNodes){
     Document newDoc = DocumentHelper.createDocument();
     Element root = newDoc.addElement(XmlType.METADATA.getRootName());
     //获取节点名称
     metadataNodes.stream().forEach(metadataNode -> {
 
-      if (metadataNode.isComment()){
+      if (metadataNode.isCommentFlag()){
         //创建注释节点
         root.addComment(metadataNode.getComment());
       }else {
@@ -142,10 +193,11 @@ public class XpathParser {
 
   /**
    * 将XmlObject解析成对应的Document对象
+   * @param childType 需要处理的子节点类型:Constants.IN 处理输入字段；Constants.OUT 处理输出字段
    * @param xmlObject
    * @return
    */
-  public static Document createDom4j(XmlObject xmlObject){
+  public static Document createDom4j(String childType,XmlObject xmlObject){
     Document newDoc = DocumentHelper.createDocument();
 
     //检查是否是root节点
@@ -154,8 +206,6 @@ public class XpathParser {
       return newDoc;
     }
 
-    //
-    XmlType xmlType = xmlObject.getXmlType();
     Element root = newDoc.addElement(xmlObject.getTagName());
 
     //根节点属性赋值
@@ -166,19 +216,17 @@ public class XpathParser {
     List<XmlObject> in = childTags.get(Constants.IN);
     List<XmlObject> out = childTags.get(Constants.OUT);
 
-    //生成metadata.xml文件,所有节点全部处理
-    if (XmlType.METADATA.equals(xmlType)){
+
+    if (Constants.IN.equals(childType)){
+      //处理输入字段
+      dealChildTags(in,newDoc);
+    }else if (Constants.OUT.equals(childType)){
+      //处理输出字段
+      dealChildTags(out,newDoc);
+    }else {
       dealChildTags(in,newDoc);
       dealChildTags(out,newDoc);
-    }else if (XmlType.SERVICE_DEFINITION.equals(xmlType)){
-
     }
-
-
-    //处理注释节点
-    List<XmlComment> contexts = xmlObject.getContexts();
-    attributeContent(newDoc,contexts);
-
 
     return newDoc;
   }
@@ -188,7 +236,6 @@ public class XpathParser {
    * @param childTags
    * @param newDoc
    */
-  @Deprecated
   public static void dealChildTags(List<XmlObject> childTags,Document newDoc){
     if (CollUtil.isNotEmpty(childTags)){
       childTags.stream().forEach(childTag -> {
@@ -257,25 +304,6 @@ public class XpathParser {
   }
 
   /**
-   * //todo 给节点设置属性值 逻辑需要完善
-   * @param doc
-   * @param contexts
-   */
-  @Deprecated
-  public static void attributeContent(Document doc,List<XmlComment> contexts){
-    if (CollUtil.isNotEmpty(contexts)){
-//      contexts.stream().forEach(xmlContext -> {
-//        //查找开始节点信息
-//        Element startNode = (Element)doc.selectSingleNode(xmlContext.getStartContext());
-//        attributeContent(startNode, xmlContext.getStartContext());
-//        //查找结束节点信息
-//        Element endNode = (Element)doc.selectSingleNode(xmlContext.getEndXpath());
-//        attributeContent(endNode, xmlContext.getEndContext());
-//      });
-    }
-  }
-
-  /**
    * 给节点设置文本值
    * @param node 节点
    * @param content 文本值
@@ -284,6 +312,21 @@ public class XpathParser {
     if (ObjectUtil.isNotEmpty(node) && StrUtil.isNotBlank(content)){
       node.setText(content);
     }
+  }
+
+  /**
+   * 转换为多个文件
+   * @param absolutePath
+   * @param doc
+   * @return
+   */
+  public static boolean transfer(List<String> absolutePath,Document doc){
+    if (CollUtil.isNotEmpty(absolutePath)){
+      absolutePath.stream().forEach(path -> {
+        transfer(path,doc);
+      });
+    }
+    return true;
   }
 
   /**
@@ -320,7 +363,7 @@ public class XpathParser {
       writer.write(doc);
       writer.flush();
       writer.close();
-      log.info("生成文件：" + outputFile.getName());
+      log.info("生成文件：" + outputFile.getAbsolutePath());
       return true;
     } catch (FileNotFoundException e) {
       log.error(e);
@@ -363,21 +406,6 @@ public class XpathParser {
       return dir.mkdirs();
     }
     return false;
-  }
-
-  public static void main(String[] args) {
-    Document document = DocumentHelper.createDocument();
-
-    //root
-    Element element = document.addElement("metadata");
-
-    String xpath = "/metadata/ServiceCode[@type='string' and @length='15' and @chinese_name='服务代码']/";
-    Element element1 = createByXPath(document,xpath);
-
-
-    transfer("E:/metadata.xml",document);
-
-
   }
 
 }

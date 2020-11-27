@@ -13,10 +13,7 @@ import com.dc.excel.ExcelIndex;
 import com.dc.excel.ExcelRow;
 import com.dc.excel.ExcelSheet;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Xml文件对象
@@ -51,7 +48,7 @@ public class XmlObject {
    * 是否是注释节点.默认false
    * //todo List<XmlComment> 这种数据格式待考证
    */
-  private boolean isComment = false;
+  private boolean commentFlag = false;
 
   /**
    * 自定义注释内容，默认的话 是当前时间+服务码
@@ -62,6 +59,11 @@ public class XmlObject {
    * 标签名
    */
   private String tagName;
+
+  /**
+   * 原来本身的路径也要保存，不能忘本！
+   */
+  private String path;
 
   /**
    * 绝对路径，Xpath操作的时候需要用到.root节点不需要
@@ -76,13 +78,7 @@ public class XmlObject {
   /**
    * 系统渠道信息:接入系统和消费系统信息
    */
-  private List<HrSystem> system;
-
-  /**
-   * xml文件类型:这个属性进行废弃
-   */
-  @Deprecated
-  private XmlType xmlType;
+  private Map<String,HrSystem> system;
 
   public XmlObject(){}
 
@@ -111,29 +107,49 @@ public class XmlObject {
    * 构建XML对象
    * @param Xpath xpath对应的节点路径
    * @param tagName 标签名
-   * @param content 标签体
-   * @param attrs   标签属性表
+   * @param path 原路径
    */
-  public XmlObject(String tagName, String Xpath,String content, Map<String, String> attrs) {
+  public XmlObject(String tagName, String Xpath,String path) {
     super();
     this.tagName = tagName;
+    if (StrUtil.isNotBlank(Xpath)){
+      Xpath = Xpath.replaceAll("/+","/");
+    }
     this.Xpath = Xpath;
-    this.content = content;
-    this.attrs = attrs;
+    if (StrUtil.isNotBlank(path)){
+      path = path.replaceAll("/+","/");
+    }
+    this.path = path;
   }
 
   /**
-   * 批量解析
+   * 批量解析Excel表格信息
    * @param sheets
    * @return
    */
-  public static XmlMetadata ofBatch(ExcelSheet... sheets){
+  public static XmlMetadata ofBatch(List<ExcelSheet> sheets){
     XmlMetadata metadata = new XmlMetadata();
+    //添加注释信息
+    metadata.addCommentNode("start");
     for (ExcelSheet sheet : sheets) {
       XmlObject xmlObject = of(sheet);
       metadata.parseXmlObject(xmlObject);
     }
+    metadata.addCommentNode("end");
     return metadata;
+  }
+
+  /**
+   * 批量解析Excel表格信息
+   * @param sheets
+   * @return
+   */
+  public static XmlMetadata ofBatch(ExcelSheet... sheets){
+    List<ExcelSheet> params = new ArrayList<>();
+    for (ExcelSheet sheet : sheets) {
+      params.add(sheet);
+    }
+    return ofBatch(params);
   }
 
   /**
@@ -141,8 +157,12 @@ public class XmlObject {
    * @param sheet
    * @return
    */
-  private static XmlObject of(ExcelSheet sheet){
+  public static XmlObject of(ExcelSheet sheet){
     XmlObject result = new XmlObject();
+
+    if (ObjectUtil.isNull(sheet)){
+      System.out.println("test");
+    }
 
     result.setServiceCode(sheet.getIndex().getServiceCode());
     //处理输入字段
@@ -158,6 +178,9 @@ public class XmlObject {
     ExcelSheet sysHead = sheet.getSysHead();
     result.setChildTags(sysHead.getOutRows(),Constants.OUT);
     result.setChildTags(sysHead.getInRows(),Constants.IN);
+    ExcelSheet common = sheet.getCommon();
+    result.setChildTags(common.getOutRows(),Constants.OUT);
+    result.setChildTags(common.getInRows(),Constants.IN);
 
     //解析索引部分:用于生成服务识别和系统识别文件
     ExcelIndex index = sheet.getIndex();
@@ -176,40 +199,49 @@ public class XmlObject {
     if (ObjectUtil.isNotEmpty(index)){
       HrSystem consumer = HrConfig.getConfig().systemMappings.get(index.getConsumerName());
       HrSystem provider = HrConfig.getConfig().systemMappings.get(index.getProviderName());
-      List<HrSystem> system = new ArrayList<>(2);
+
       if (ObjectUtil.isNotEmpty(consumer)){
-        system.add(consumer);
+        getSystem().put(Constants.CONSUMER_CHANNEL,consumer);
       }else {
         log.warn("c端渠道：【"+index.getConsumerName()+"】无法找到对应的信息，请检查配置");
       }
       if (ObjectUtil.isNotEmpty(provider)){
-        system.add(provider);
+        getSystem().put(Constants.PROVIDER_SYSTEM,provider);
       }else {
         log.warn("P端渠道：【"+index.getProviderName()+"】无法找到对应的信息，请检查配置");
       }
-      setSystem(system);
     }
   }
 
   /**
-   * 处理子节点信息。并且给子节点属性赋值
+   * 处理子节点信息:
+   *  1.生成节点的xpath信息；2.给节点设置属性
    * @param rows
    * @param nodeType in节点；out节点
    */
   private void setChildTags(List<ExcelRow> rows,String nodeType){
     List<XmlObject> list = CollUtil.newArrayList();
 
+    if (CollUtil.isEmpty(rows)){
+      return;
+    }
+
     rows.stream().forEach(row -> {
-      String rootPath = getRootPath(row.getPath(),nodeType);
-      //创建新节点加入
+      //已删除节点不进行处理
+      if (row.isDeleteFlag()){
+        return;
+      }
+      //String xpath = getXpath(row.getPath(),nodeType);//此处不再生成Xpath节点信息，因为没办法针对不同类型的文件。
+      //创建新节点加入:
       XmlObject node;
       if (Constants.XML_ARRAY.equals(row.getType())){
-        //type节点做特殊处理
-        node = XpathParser.createNode(row.getTagName(), rootPath+"array", null, null);
+        //type节点做特殊处理 此处Xpath的值为：xpath+"array"，因为赋值地方更改，所以将array赋值给path
+        node = XpathParser.createNode(row.getTagName(), null, row.getPath()+"/array/");//
         node.setAttrs("type","array");
         node.setAttrs("is_struct","false");
       }else {
-        node = XpathParser.createNode(row.getTagName(), rootPath, null, null);
+        //XpathParser.createNode(row.getTagName(), xpath, row.getPath());
+        node = XpathParser.createNode(row.getTagName(), null, row.getPath());
         node.setAttrs(row);
       }
       list.add(node);
@@ -218,34 +250,62 @@ public class XmlObject {
   }
 
   /**
-   * 处理路径信息，将路径信息转换为Xpath所需要的格式
-   * @param path
-   * @param nodeType
-   * @return
+   * 给输入输出子节点设置Xpath的值
+   * @param xmlType
    */
-  private String getRootPath(String path,String nodeType){
-    String rootPath = "";
-    if (XmlType.METADATA.equals(this.xmlType)){
-      rootPath = "/metadata";
-    }else if (XmlType.SERVICE.equals(this.xmlType)) {
-      rootPath = "/"+path;
-    }else if (XmlType.SYSTEM_IDENTIFY.equals(this.xmlType)){
-
-    }else if (XmlType.SERVICE_IDENTIFY.equals(this.xmlType)){
-
-    }else if (XmlType.SERVICE_DEFINITION.equals(this.xmlType)){
-      // /S0200200000510/request/sdoroot  /S0200200000510/response/sdoroot
-      rootPath = path.replace("service","/S"+this.serviceCode+"/"+(Constants.IN.equals(nodeType)?"request":"response")+"/sdoroot");
-      //当检测到 */array/* 时，需要在路径后加一个 sdo节点
-      if (verifyArray(rootPath)){
-        rootPath += "sdo";
+  public void setChildXpath(XmlType xmlType) {
+    Map<String, List<XmlObject>> childTags = getChildTags();
+    if (MapUtil.isNotEmpty(childTags)){
+      List<XmlObject> ins = childTags.get(Constants.IN);
+      List<XmlObject> outs = childTags.get(Constants.OUT);
+      if (CollUtil.isNotEmpty(ins)){
+        ins.stream().forEach(in -> {
+          String inXpath = getXpath(xmlType, Constants.IN);
+          in.setXpath(inXpath);
+        });
+      }
+      if (CollUtil.isNotEmpty(outs)){
+        outs.stream().forEach(out -> {
+          String outXpath = getXpath(xmlType, Constants.OUT);
+          out.setXpath(outXpath);
+        });
       }
     }
-    return rootPath;
   }
 
   /**
-   *
+   * 处理路径信息，将路径信息转换为Xpath所需要的格式
+   * @param xmlType
+   * @param nodeType 输入，输出字段标识
+   * @return
+   */
+  private String getXpath(XmlType xmlType,String nodeType){
+    String Xpath = "";
+    if (XmlType.METADATA.equals(xmlType)){
+      Xpath = "/metadata";
+    }else if (XmlType.SERVICE.equals(xmlType)) {
+      Xpath = "/"+this.path;
+    }else if (XmlType.SYSTEM_IDENTIFY.equals(xmlType)){
+      //系统识别不在这里处理
+      return Xpath;
+    }else if (XmlType.SERVICE_IDENTIFY.equals(xmlType)){
+      //系统识别不在这里处理
+      return Xpath;
+    }else if (XmlType.SERVICE_DEFINITION.equals(xmlType)){
+      // /S0200200000510/request/sdoroot  /S0200200000510/response/sdoroot
+      Xpath = path.replace("service","/S"+this.serviceCode+"/"+(Constants.IN.equals(nodeType)?"request":"response")+"/sdoroot");
+      //当检测到 */array/* 时，需要在路径后加一个 sdo节点
+      if (verifyArray(Xpath)){
+        Xpath += "/sdo";
+      }
+    }
+    return Xpath.replaceAll("/+","/");
+  }
+
+  /**
+   * 根据/对路径进行切割
+   * 如果检测路径倒数第二个为array时进行处理
+   * 例如：service/APP_HEAD/array/AuthTellerInfo/->处理后变为 service/APP_HEAD/array/AuthTellerInfo/sdo
    * @param path
    * @return
    */
@@ -364,12 +424,12 @@ public class XmlObject {
     this.rootElement = rootElement;
   }
 
-  public boolean isComment() {
-    return isComment;
+  public boolean isCommentFlag() {
+    return commentFlag;
   }
 
-  public void setComment(boolean comment) {
-    isComment = comment;
+  public void setCommentFlag(boolean commentFlag) {
+    this.commentFlag = commentFlag;
   }
 
   public String getComment() {
@@ -408,7 +468,7 @@ public class XmlObject {
   }
 
   public void setXpath(String xpath) {
-    Xpath = xpath;
+    this.Xpath = xpath;
   }
 
   public String getServiceCode() {
@@ -419,12 +479,22 @@ public class XmlObject {
     this.serviceCode = serviceCode;
   }
 
-  public List<HrSystem> getSystem() {
+  public Map<String, HrSystem> getSystem() {
+    if (MapUtil.isEmpty(system)){
+      this.system = new HashMap<>(2);
+    }
     return system;
   }
 
-  public void setSystem(List<HrSystem> system) {
+  public void setSystem(Map<String, HrSystem> system) {
     this.system = system;
   }
 
+  public String getPath() {
+    return path;
+  }
+
+  public void setPath(String path) {
+    this.path = path;
+  }
 }

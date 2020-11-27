@@ -1,5 +1,6 @@
 package com.dc;
 
+import com.dc.common.Constants;
 import com.dc.config.HrConfig;
 import com.dc.excel.ExcelParse;
 import com.dc.excel.ExcelSheet;
@@ -9,7 +10,9 @@ import com.dc.rule.impl.MetadataRuleStrategy;
 import com.dc.sftp.SshUtil;
 import com.dc.xml.XmlMetadata;
 import com.dc.xml.XmlObject;
+import com.dc.xml.XmlType;
 import com.dc.xml.XpathParser;
+import org.dom4j.Document;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -17,13 +20,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 工具启动类
- *
  * @author: Administrator
- * @date: 2020-11-18 11:14
+ * @date: 2020-11-18 11:13
  * @version: 1.0
  */
-public class Start {
+public class StarTest {
 
   /**
    * 配置文件信息
@@ -31,14 +32,6 @@ public class Start {
   public static final HrConfig config = HrConfig.getConfig();
 
   public static void main(String[] args) {
-    /** 一.下载文件 **/
-    // 1.从服务器上下载in/out端metadata.xml
-    SshUtil.download();
-
-    /** 二.执行前置规则 **/
-    // 2.解析服务器上in/out端的metadata.xml：比较字段异同情况。输出比较结果
-    RuleStrategy metadataRuleStrategy = new MetadataRuleStrategy();
-    metadataRuleStrategy.preCheckRule(new BaseRule());
 
     /** 三.解析Excel数据 **/
     // 3.解析配置local.excel.services配置的sheet页。

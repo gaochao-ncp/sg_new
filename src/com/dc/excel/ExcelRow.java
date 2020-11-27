@@ -19,7 +19,7 @@ public class ExcelRow extends CommonField {
   /**
    * 是否存在删除线
    */
-  private boolean isDelete = false;
+  private boolean deleteFlag = false;
 
   public String getPath() {
     return path;
@@ -29,11 +29,11 @@ public class ExcelRow extends CommonField {
     this.path = path;
   }
 
-  public boolean isDelete() {
-    return isDelete;
+  public boolean isDeleteFlag() {
+    return deleteFlag;
   }
 
-  public void setDelete(boolean delete) {
-    isDelete = delete;
+  public void setDeleteFlag(boolean deleteFlag) {
+    this.deleteFlag = deleteFlag;
   }
 }

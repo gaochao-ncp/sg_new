@@ -26,7 +26,7 @@ public class MetadataNode {
   /** 精度:当type=double的时候存在 **/
   private String scale;
   private String comment;
-  private boolean isComment = false;
+  private boolean commentFlag = false;
 
   /**
    * 对比两个节点的值.默认传入out端的节点,因为要输出信息
@@ -127,11 +127,11 @@ public class MetadataNode {
     this.comment = comment;
   }
 
-  public boolean isComment() {
-    return isComment;
+  public boolean isCommentFlag() {
+    return commentFlag;
   }
 
-  public void setComment(boolean comment) {
-    isComment = comment;
+  public void setCommentFlag(boolean commentFlag) {
+    this.commentFlag = commentFlag;
   }
 }
