@@ -14,14 +14,19 @@ import java.util.List;
 public interface Constants {
 
 	/**
-	 * 要生成的文件类型
+	 * 要生成的文件类型:拆组包文件和服务定义文件
 	 */
-	List<XmlType> XML_TYPE_LIST = Arrays.asList(new XmlType[]{XmlType.METADATA,XmlType.SERVICE,XmlType.SERVICE_DEFINITION});
+	List<XmlType> XML_TYPE_LIST = Arrays.asList(new XmlType[]{XmlType.SERVICE,XmlType.SERVICE_DEFINITION});
 
 	/**
 	 * 截取 12,3 double类型的数字
 	 */
 	String REGEX = "[0-9]*,[0-9]*";
+
+	/**
+	 * 是否是数字
+	 */
+	String NUMERIC = "[0-9]*";
 
 	String IN_CN = "输入";
 

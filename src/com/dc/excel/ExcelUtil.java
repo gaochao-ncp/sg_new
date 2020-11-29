@@ -8,9 +8,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
 import com.dc.common.Constants;
-import org.apache.poi.hssf.usermodel.HSSFCell;
 import org.apache.poi.hssf.usermodel.HSSFDateUtil;
-import org.apache.poi.hssf.usermodel.HSSFFont;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -19,9 +17,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.DateFormat;
 import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -215,12 +211,30 @@ public class ExcelUtil {
   }
 
   /**
+   * 动态获取[输入]行的下标
+   * @param sheet
+   * @return
+   */
+  public static int dynamicGetInCnIndex(Sheet sheet){
+    int start = 1;
+    //getLastRowNum()返回最后一行的下标，所以遍历的时候需要小于等于
+    for (int i = 0; i <= sheet.getLastRowNum(); i++) {
+      List<String> list = readRow(sheet.getRow(i));
+      if (list.contains(Constants.IN_CN)){
+        start += i;
+        break;
+      }
+    }
+    return start;
+  }
+
+  /**
    * 读取输入字段
    * @param sheet
    * @return
    */
   public static List<ExcelRow> readInRow(Sheet sheet){
-    return readInRow(readRow(sheet, 7));
+    return readInRow(readRow(sheet, dynamicGetInCnIndex(sheet)));
   }
 
   /**
@@ -238,7 +252,10 @@ public class ExcelUtil {
           break;
         }
         //输入节点
-        in.add(readExcelRow(row));
+        ExcelRow excelRow = readExcelRow(row);
+        if (!excelRow.ignoreRow()){
+          in.add(excelRow);
+        }
       }
     }
     return in;
@@ -250,7 +267,7 @@ public class ExcelUtil {
    * @return
    */
   public static List<List<String>> readOut(Sheet sheet){
-    return readOut(read(sheet,7));
+    return readOut(read(sheet,dynamicGetInCnIndex(sheet)));
   }
 
   /**
@@ -300,7 +317,10 @@ public class ExcelUtil {
         List<String> list = readRow(row);
         if (outFlag) {
           //输出节点
-          out.add(readExcelRow(row));
+          ExcelRow excelRow = readExcelRow(row);
+          if (!excelRow.ignoreRow()){
+            out.add(excelRow);
+          }
         }
         if (list.contains(Constants.OUT_CN)) {
           outFlag =true;

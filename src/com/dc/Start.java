@@ -65,6 +65,7 @@ public class Start {
 
     /** 五.将Excel数据解析成对应的Xml对象 **/
     XmlMetadata metadata = XmlObject.ofBatch(excelSheets);
+    metadata.checkData();
 
     /** 六.生成对应的xml文件 **/
     XpathParser.ofTransferBatch(metadata);

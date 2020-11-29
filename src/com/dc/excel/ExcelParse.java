@@ -26,10 +26,8 @@ public class ExcelParse {
 
   private static final Log log = LogFactory.get(ExcelParse.class);
 
-
-
   /**
-   * 解析Excel的全部sheet数据
+   * 解析Excel的全部sheet数据.
    * @param absolutePath 绝对路径
    * @return
    */
@@ -115,7 +113,6 @@ public class ExcelParse {
     ExcelSheet sheet = new ExcelSheet();
 
     if (ObjectUtil.isNull(sheetBean)){
-      log.warn("解析表格为空，请核实！");
       return sheet;
     }
 
@@ -127,7 +124,7 @@ public class ExcelParse {
 
     sheet.setSheetName(sheetName);
 
-    List<Row> read = ExcelUtil.readRow(sheetBean, 7);
+    List<Row> read = ExcelUtil.readRow(sheetBean, ExcelUtil.dynamicGetInCnIndex(sheetBean));
     List<ExcelRow> inRowValue = ExcelUtil.readInRow(read);
     List<ExcelRow> outRowValue = ExcelUtil.readOutRow(read);
 
@@ -164,7 +161,8 @@ public class ExcelParse {
     }
 
     if (StrUtil.isBlank(index.getServiceCode())){
-      log.warn("当前sheetName【"+sheetName+"】没有在索引页中搜索到对应的数据");
+      //索引页没有找到对应的信息的时候会导致通过index获取serviceCode的时候获取不到，导致取值出现问题
+      log.warn("【"+sheetName+"】没有在索引页中搜索到对应的数据,请通知服务治理人员检查文档的准确性！");
     }
     return index;
   }

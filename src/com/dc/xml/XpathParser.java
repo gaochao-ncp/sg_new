@@ -64,8 +64,8 @@ public class XpathParser {
    * @param path 原路径
    * @return XMLObject 新节点对象
    */
-  public static XmlObject createNode(String tagName, String Xpath, String path) {
-    XmlObject newNode = new XmlObject(tagName, Xpath, path);
+  public static XmlObject createNode(String tagName, String Xpath, String path, String serviceCode) {
+    XmlObject newNode = new XmlObject(tagName, Xpath, path, serviceCode);
     return newNode;
   }
 
@@ -107,7 +107,7 @@ public class XpathParser {
 
   public static boolean ofTransfer(List<XmlObject> xmlObjectList){
     xmlObjectList.stream().forEach(xmlObject -> {
-      ofTransfer(xmlObject,false);
+      ofTransfer(xmlObject);
     });
     return true;
   }
@@ -117,41 +117,45 @@ public class XpathParser {
    * <p>
    *   这个方法无法生成metadata.xml方法,将 metadataFlag 设置为true可以生成
    * </p>
-   * @param metadataFlag 是否处理metadata.xml true 处理；false 不处理。目前处理方法还没写好
    * @param xmlObject
    * @return
    */
-  public static boolean ofTransfer(XmlObject xmlObject,boolean metadataFlag){
+  public static boolean ofTransfer(XmlObject xmlObject){
+
+    //跳过注释节点
+    if (xmlObject.isCommentFlag()){
+      return true;
+    }
+
     Constants.XML_TYPE_LIST.stream().forEach(xmlType -> {
       //设置根节点名称
       xmlObject.setTagName(xmlType);
       //根据XmlType生成对应的Xpath
-      xmlObject.setChildXpath(xmlType);
+      //xmlObject.setChildXpath(xmlType);
+      xmlObject.setXmlType(xmlType);
       //消费者系统
       HrSystem consumer = xmlObject.getSystem().get(Constants.CONSUMER_CHANNEL);
       //提供者系统
       HrSystem provider = xmlObject.getSystem().get(Constants.PROVIDER_SYSTEM);
       //根据XmlType决定对应的路径 从LOCAL_URL中获取
-      String absolutePath = "";
-      if (XmlType.METADATA.equals(xmlType)){
-        //在 ofTransferBatch 方法中已经处理了，这里不再进行处理
-        if (metadataFlag){
-          //todo 生成metadata.xml文件
-        }else {
-          return;
-        }
-      }else if (XmlType.SERVICE.equals(xmlType)){
+      if (XmlType.SERVICE.equals(xmlType)){
         //给 Service 节点设置属性
         xmlObject.setAttrs(Constants.NODE_PACKAGE_TYPE,Constants.NODE_PACKAGE_TYPE_VALUE);
         xmlObject.setAttrs(Constants.NODE_STORE_MODE,Constants.NODE_STORE_MODE_VALUE);
 
         Document inDoc = createDom4j(Constants.IN, xmlObject);
         //输入字段生成 in端的拆包和out端的组包文件
-        List<String> inFilePath = CommonUtil.generateFilePath(Constants.IN,consumer.getCode(),provider.getCode(),xmlObject.getServiceCode());
+        List<String> inFilePath = CommonUtil.generateFilePath(Constants.IN,
+                ObjectUtil.isNotNull(consumer)?consumer.getCode():"404",
+                ObjectUtil.isNotNull(provider)?provider.getCode():"404",
+                xmlObject.getServiceCode());
         transfer(inFilePath,inDoc);
 
         Document outDoc = createDom4j(Constants.OUT, xmlObject);
-        List<String> outFilePath = CommonUtil.generateFilePath(Constants.IN,consumer.getCode(),provider.getCode(),xmlObject.getServiceCode());
+        List<String> outFilePath = CommonUtil.generateFilePath(Constants.IN,
+                ObjectUtil.isNotNull(consumer)?consumer.getCode():"404",
+                ObjectUtil.isNotNull(provider)?provider.getCode():"404",
+                xmlObject.getServiceCode());
         transfer(outFilePath,outDoc);
 
         //最后将设置的属性清空
@@ -178,7 +182,6 @@ public class XpathParser {
     Element root = newDoc.addElement(XmlType.METADATA.getRootName());
     //获取节点名称
     metadataNodes.stream().forEach(metadataNode -> {
-
       if (metadataNode.isCommentFlag()){
         //创建注释节点
         root.addComment(metadataNode.getComment());
@@ -192,8 +195,8 @@ public class XpathParser {
   }
 
   /**
-   * 将XmlObject解析成对应的Document对象
-   * @param childType 需要处理的子节点类型:Constants.IN 处理输入字段；Constants.OUT 处理输出字段
+   * 将XmlObject解析成对应的Document对象,并且生成xml文件
+   * @param childType
    * @param xmlObject
    * @return
    */
@@ -207,111 +210,27 @@ public class XpathParser {
     }
 
     Element root = newDoc.addElement(xmlObject.getTagName());
-
     //根节点属性赋值
-    attributeValue(root,xmlObject.getAttrs());
+    xmlObject.attributeValue(root);
 
     //处理子标签
     Map<String, List<XmlObject>> childTags = xmlObject.getChildTags();
     List<XmlObject> in = childTags.get(Constants.IN);
     List<XmlObject> out = childTags.get(Constants.OUT);
 
-
-    if (Constants.IN.equals(childType)){
-      //处理输入字段
-      dealChildTags(in,newDoc);
-    }else if (Constants.OUT.equals(childType)){
-      //处理输出字段
-      dealChildTags(out,newDoc);
-    }else {
-      dealChildTags(in,newDoc);
-      dealChildTags(out,newDoc);
+    XmlType xmlType = xmlObject.getXmlType();
+    if (XmlType.SERVICE.equals(xmlType) && Constants.IN.equals(childType)){
+      //处理输入字段,生成拆组包文件
+      xmlObject.dealChildTags(in,newDoc,"");
+    }else if (XmlType.SERVICE.equals(xmlType) && Constants.OUT.equals(childType)){
+      //处理输出字段,生成拆文件组包
+      xmlObject.dealChildTags(out,newDoc,"");
+    }else if (XmlType.SERVICE_DEFINITION.equals(xmlType) && Constants.ALL.equals(childType)){
+      //生成服务定义文件
+      xmlObject.dealChildTags(in,newDoc,"request");
+      xmlObject.dealChildTags(out,newDoc,"response");
     }
-
     return newDoc;
-  }
-
-  /**
-   * 处理子节点
-   * @param childTags
-   * @param newDoc
-   */
-  public static void dealChildTags(List<XmlObject> childTags,Document newDoc){
-    if (CollUtil.isNotEmpty(childTags)){
-      childTags.stream().forEach(childTag -> {
-        //创建 xpath对应的 节点
-        Element parent = createByXPath(newDoc,childTag.getXpath());
-        if (null != parent){
-          //设置属性
-          Element node = parent.addElement(childTag.getTagName());
-          attributeValue(node, childTag.getAttrs());
-          attributeContent(node, childTag.getContent());
-        }
-      });
-    }
-  }
-
-  /**
-   * 使用xpath表达式创建节点
-   * @param doc
-   * @param xpath
-   * @return
-   */
-  public static Element createByXPath(Document doc, String xpath){
-
-    if (StrUtil.isBlank(xpath)){
-      log.warn("传入的Xpath为空，无法解析");
-    }
-
-    if (xpath.endsWith("/")){
-      //去除最后面得/号，防止通过Xpath查询的时候报错
-      xpath = xpath.substring(0,xpath.length()-1);
-    }
-
-    if (doc.selectSingleNode(xpath) != null) {
-      log.warn("重复字段：" + doc.selectSingleNode(xpath).getPath() + " [已忽略]");
-      return (Element) doc.selectSingleNode(xpath);
-
-    }
-
-    String path = xpath.substring(0, xpath.lastIndexOf("/"));
-    Element e = (Element) doc.selectSingleNode(path);
-    if (null == e) {
-      e = createByXPath(doc, path);
-      if (e.getParent().getName().toLowerCase().equals("array")) {
-        e.addAttribute("metadataid", e.getName());
-        e.addAttribute("type", "array");
-        e.addAttribute("is_struct", "false");
-      }
-    }
-    e = e.addElement(xpath.substring(xpath.lastIndexOf("/") + 1, xpath.length()));
-    return e;
-  }
-
-  /**
-   * 给节点属性赋值
-   * @param node
-   * @param attrs
-   */
-  public static void attributeValue(Element node, Map<String, String> attrs){
-    if (MapUtil.isNotEmpty(attrs)) {
-      for (Map.Entry<String, String> entry : attrs.entrySet()) {
-        node.addAttribute(entry.getKey(), entry.getValue());
-      }
-    }else {
-      log.info("节点："+node.getName()+"传入的属性为空");
-    }
-  }
-
-  /**
-   * 给节点设置文本值
-   * @param node 节点
-   * @param content 文本值
-   */
-  public static void attributeContent(Node node,String content){
-    if (ObjectUtil.isNotEmpty(node) && StrUtil.isNotBlank(content)){
-      node.setText(content);
-    }
   }
 
   /**

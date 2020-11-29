@@ -12,6 +12,8 @@ import org.apache.poi.ss.usermodel.Sheet;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 通用工具类
@@ -40,7 +42,6 @@ public class CommonUtil {
    */
   public static boolean filteredSheet(String sheetName){
     if (HrConfig.getConfig().getFilteredSheets().contains(sheetName)){
-      log.warn("针对当前sheet页：【"+sheetName+"】无法解析，会在后续进行解析。");
       return true;
     }
     return false;
@@ -64,7 +65,8 @@ public class CommonUtil {
     if (Constants.SHEET_COMMON.equals(sheetName)
             || Constants.SHEET_INDEX.equals(sheetName)
             || Constants.SHEET_SYS_HEAD.equals(sheetName)
-            || Constants.SHEET_APP_HEAD.equals(sheetName)){
+            || Constants.SHEET_APP_HEAD.equals(sheetName)
+            || Constants.SHEET_COMMON_FILED.equals(sheetName)){
       return true;
     }
     return false;
@@ -139,6 +141,20 @@ public class CommonUtil {
       newArray.add(s.trim());
     }
     return newArray;
+  }
+
+  /**
+   * 判断字符是否是数字
+   * @param str
+   * @return
+   */
+  public static boolean isNumeric(String str){
+    Pattern pattern = Pattern.compile(Constants.NUMERIC);
+    Matcher isNum = pattern.matcher(str);
+    if (!isNum.matches()) {
+      return false;
+    }
+    return true;
   }
 
 }

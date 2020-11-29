@@ -1,5 +1,8 @@
 package com.dc.excel;
 
+import cn.hutool.core.util.StrUtil;
+import com.dc.common.CommonUtil;
+
 import java.util.List;
 
 /**
@@ -44,7 +47,7 @@ public class ExcelSheet {
   private ExcelSheet common;
 
   /**
-   * 是否解析标志
+   * 是否解析标志:当无法解析的时候会返回一个为false的对象，如果此标志不为true的话，就不对该对象进行下一步的解析
    */
   private boolean parseFlag = false;
 
@@ -110,5 +113,22 @@ public class ExcelSheet {
 
   public void setCommon(ExcelSheet common) {
     this.common = common;
+  }
+
+  /**
+   * 获取服务码
+   * @param excelSheet
+   * @return
+   */
+  public String getServiceCode(ExcelSheet excelSheet){
+    //先从索引页中查找服务码
+    String serviceCode = excelSheet.getIndex().getServiceCode();
+    if (StrUtil.isEmpty(serviceCode)){
+      //无法找到的时候取sheet名
+      if (StrUtil.isNotBlank(excelSheet.getSheetName()) && CommonUtil.isNumeric(excelSheet.getSheetName())){
+        serviceCode = excelSheet.getSheetName();
+      }
+    }
+    return serviceCode;
   }
 }

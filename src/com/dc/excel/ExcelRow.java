@@ -1,5 +1,8 @@
 package com.dc.excel;
 
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.log.Log;
+import cn.hutool.log.LogFactory;
 import com.dc.common.CommonField;
 
 /**
@@ -10,6 +13,8 @@ import com.dc.common.CommonField;
  * @version: 1.0
  */
 public class ExcelRow extends CommonField {
+
+  private static final Log log = LogFactory.get(ExcelRow.class);
 
   /**
    * 存放路径
@@ -35,5 +40,18 @@ public class ExcelRow extends CommonField {
 
   public void setDeleteFlag(boolean deleteFlag) {
     this.deleteFlag = deleteFlag;
+  }
+
+  /**
+   * 检查数据是否合法，如果不合法，不进行添加
+   * @return true 数据不合法，忽略；false 数据合法，添加
+   */
+  public boolean ignoreRow(){
+    if (StrUtil.isBlank(super.tagName)){
+      log.warn("Excel Row 节点 tagName 为空，请检查文档的数据正确性！自动忽略该节点");
+      return true;
+    }
+    return false;
+
   }
 }

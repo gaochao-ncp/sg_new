@@ -1,6 +1,7 @@
 package com.dc.xml;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
@@ -12,6 +13,9 @@ import com.dc.config.HrSystem;
 import com.dc.excel.ExcelIndex;
 import com.dc.excel.ExcelRow;
 import com.dc.excel.ExcelSheet;
+import org.dom4j.Document;
+import org.dom4j.Element;
+import org.dom4j.Node;
 
 import java.util.*;
 
@@ -32,7 +36,7 @@ public class XmlObject {
   /**
    * 子标签集合:包含输入输出字段。 key：in|out ==>Constants.IN Constants.OUT
    */
-  private Map<String, List<XmlObject>> childTags = new LinkedHashMap<>();
+  private Map<String, List<XmlObject>> childTags = new HashMap<>();
 
   /**
    * 标签文本内容
@@ -80,6 +84,13 @@ public class XmlObject {
    */
   private Map<String,HrSystem> system;
 
+  /**
+   * 根据这个类型生成对应的Xpath路径。必须存在该值，不然程序报错停止
+   * 应用位置为：
+   * {@link XpathParser#ofTransfer(XmlObject)}
+   */
+  private XmlType xmlType;
+
   public XmlObject(){}
 
   /**
@@ -109,7 +120,7 @@ public class XmlObject {
    * @param tagName 标签名
    * @param path 原路径
    */
-  public XmlObject(String tagName, String Xpath,String path) {
+  public XmlObject(String tagName, String Xpath,String path,String serviceCode) {
     super();
     this.tagName = tagName;
     if (StrUtil.isNotBlank(Xpath)){
@@ -120,6 +131,7 @@ public class XmlObject {
       path = path.replaceAll("/+","/");
     }
     this.path = path;
+    this.serviceCode = serviceCode;
   }
 
   /**
@@ -129,13 +141,14 @@ public class XmlObject {
    */
   public static XmlMetadata ofBatch(List<ExcelSheet> sheets){
     XmlMetadata metadata = new XmlMetadata();
-    //添加注释信息
-    metadata.addCommentNode("start");
+    //添加注释
+    metadata.addCommentNodeStart();
     for (ExcelSheet sheet : sheets) {
       XmlObject xmlObject = of(sheet);
       metadata.parseXmlObject(xmlObject);
     }
-    metadata.addCommentNode("end");
+    //添加注释
+    metadata.addCommentNodeEnd();
     return metadata;
   }
 
@@ -161,10 +174,11 @@ public class XmlObject {
     XmlObject result = new XmlObject();
 
     if (ObjectUtil.isNull(sheet)){
-      System.out.println("test");
+      return result;
     }
 
-    result.setServiceCode(sheet.getIndex().getServiceCode());
+    String serviceCode = sheet.getServiceCode(sheet);
+    result.setServiceCode(serviceCode);
     //处理输入字段
     result.setChildTags(sheet.getInRows(),Constants.IN);
 
@@ -173,14 +187,23 @@ public class XmlObject {
 
     //解析公共部分
     ExcelSheet appHead = sheet.getAppHead();
-    result.setChildTags(appHead.getOutRows(),Constants.OUT);
-    result.setChildTags(appHead.getInRows(),Constants.IN);
+    if (appHead.isParseFlag()){
+      result.setChildTags(appHead.getOutRows(),Constants.OUT);
+      result.setChildTags(appHead.getInRows(),Constants.IN);
+    }
+
     ExcelSheet sysHead = sheet.getSysHead();
-    result.setChildTags(sysHead.getOutRows(),Constants.OUT);
-    result.setChildTags(sysHead.getInRows(),Constants.IN);
+    if (sysHead.isParseFlag()){
+      result.setChildTags(sysHead.getOutRows(),Constants.OUT);
+      result.setChildTags(sysHead.getInRows(),Constants.IN);
+    }
+
     ExcelSheet common = sheet.getCommon();
-    result.setChildTags(common.getOutRows(),Constants.OUT);
-    result.setChildTags(common.getInRows(),Constants.IN);
+    if (common.isParseFlag()){
+      result.setChildTags(common.getOutRows(),Constants.OUT);
+      result.setChildTags(common.getInRows(),Constants.IN);
+    }
+
 
     //解析索引部分:用于生成服务识别和系统识别文件
     ExcelIndex index = sheet.getIndex();
@@ -197,17 +220,21 @@ public class XmlObject {
    */
   private void setSystem(ExcelIndex index){
     if (ObjectUtil.isNotEmpty(index)){
-      HrSystem consumer = HrConfig.getConfig().systemMappings.get(index.getConsumerName());
-      HrSystem provider = HrConfig.getConfig().systemMappings.get(index.getProviderName());
+      Set<Map.Entry<String, HrSystem>> entries = HrConfig.getConfig().systemMappings.entrySet();
+      for (Map.Entry<String, HrSystem> entry : entries) {
+        HrSystem system = entry.getValue();
+        if (system.getValue().equals(index.getConsumerName())){
+          getSystem().put(Constants.CONSUMER_CHANNEL,system);
+        }
+        if (system.getValue().equals(index.getProviderName())){
+          getSystem().put(Constants.PROVIDER_SYSTEM,system);
+        }
+      }
 
-      if (ObjectUtil.isNotEmpty(consumer)){
-        getSystem().put(Constants.CONSUMER_CHANNEL,consumer);
-      }else {
+      if (!ObjectUtil.isNotEmpty(getSystem().get(Constants.CONSUMER_CHANNEL))){
         log.warn("c端渠道：【"+index.getConsumerName()+"】无法找到对应的信息，请检查配置");
       }
-      if (ObjectUtil.isNotEmpty(provider)){
-        getSystem().put(Constants.PROVIDER_SYSTEM,provider);
-      }else {
+      if (!ObjectUtil.isNotEmpty(getSystem().get(Constants.PROVIDER_SYSTEM))){
         log.warn("P端渠道：【"+index.getProviderName()+"】无法找到对应的信息，请检查配置");
       }
     }
@@ -215,38 +242,44 @@ public class XmlObject {
 
   /**
    * 处理子节点信息:
-   *  1.生成节点的xpath信息；2.给节点设置属性
+   *  1.生成节点的xpath信息；2.给节点设置属性。serviceCode必须设置
    * @param rows
    * @param nodeType in节点；out节点
    */
   private void setChildTags(List<ExcelRow> rows,String nodeType){
-    List<XmlObject> list = CollUtil.newArrayList();
-
     if (CollUtil.isEmpty(rows)){
       return;
     }
-
+    List<XmlObject> nodeLis = new ArrayList<>();
     rows.stream().forEach(row -> {
       //已删除节点不进行处理
       if (row.isDeleteFlag()){
         return;
       }
-      //String xpath = getXpath(row.getPath(),nodeType);//此处不再生成Xpath节点信息，因为没办法针对不同类型的文件。
+      //String xpath = getXpath(row.getPath(),nodeType);//此处不再生成Xpath节点信息，因为没办法针对不同类型的文件。xpath setChildXpath 方法进行赋值
       //创建新节点加入:
       XmlObject node;
       if (Constants.XML_ARRAY.equals(row.getType())){
         //type节点做特殊处理 此处Xpath的值为：xpath+"array"，因为赋值地方更改，所以将array赋值给path
-        node = XpathParser.createNode(row.getTagName(), null, row.getPath()+"/array/");//
+        node = XpathParser.createNode(row.getTagName(), null, row.getPath()+"/array/",this.serviceCode);//
         node.setAttrs("type","array");
         node.setAttrs("is_struct","false");
       }else {
-        //XpathParser.createNode(row.getTagName(), xpath, row.getPath());
-        node = XpathParser.createNode(row.getTagName(), null, row.getPath());
+        //这里的this.serviceCode是父节点的serviceCode
+        node = XpathParser.createNode(row.getTagName(), null, row.getPath(),this.serviceCode);
         node.setAttrs(row);
       }
-      list.add(node);
+      nodeLis.add(node);
     });
-    getChildTags().put(nodeType,list);
+
+    if (CollUtil.isNotEmpty(nodeLis)){
+      List<XmlObject> xmlObjects = getChildTags().get(nodeType);
+      if (CollUtil.isEmpty(xmlObjects)){
+        getChildTags().put(nodeType,nodeLis);
+      }else {
+        xmlObjects.addAll(nodeLis);
+      }
+    }
   }
 
   /**
@@ -260,13 +293,13 @@ public class XmlObject {
       List<XmlObject> outs = childTags.get(Constants.OUT);
       if (CollUtil.isNotEmpty(ins)){
         ins.stream().forEach(in -> {
-          String inXpath = getXpath(xmlType, Constants.IN);
+          String inXpath = in.getXpath(xmlType, Constants.IN);
           in.setXpath(inXpath);
         });
       }
       if (CollUtil.isNotEmpty(outs)){
         outs.stream().forEach(out -> {
-          String outXpath = getXpath(xmlType, Constants.OUT);
+          String outXpath = out.getXpath(xmlType, Constants.OUT);
           out.setXpath(outXpath);
         });
       }
@@ -275,11 +308,20 @@ public class XmlObject {
 
   /**
    * 处理路径信息，将路径信息转换为Xpath所需要的格式
-   * @param xmlType
-   * @param nodeType 输入，输出字段标识
+   * @param nodeType
    * @return
    */
-  private String getXpath(XmlType xmlType,String nodeType){
+  public String getXpath(String nodeType){
+    return getXpath(this.xmlType,nodeType);
+  }
+
+  /**
+   * 处理路径信息，将路径信息转换为Xpath所需要的格式
+   * @param xmlType
+   * @param nodeType 输入，输出字段决定服务定义文件中的xml报文节点组成。in->request;out->response
+   * @return
+   */
+  public String getXpath(XmlType xmlType,String nodeType){
     String Xpath = "";
     if (XmlType.METADATA.equals(xmlType)){
       Xpath = "/metadata";
@@ -293,7 +335,7 @@ public class XmlObject {
       return Xpath;
     }else if (XmlType.SERVICE_DEFINITION.equals(xmlType)){
       // /S0200200000510/request/sdoroot  /S0200200000510/response/sdoroot
-      Xpath = path.replace("service","/S"+this.serviceCode+"/"+(Constants.IN.equals(nodeType)?"request":"response")+"/sdoroot");
+      Xpath = path.replace("service","/S"+this.serviceCode+"/"+nodeType+"/sdoroot");
       //当检测到 */array/* 时，需要在路径后加一个 sdo节点
       if (verifyArray(Xpath)){
         Xpath += "/sdo";
@@ -386,6 +428,105 @@ public class XmlObject {
     }
   }
 
+  /**
+   * 处理子节点生成文档对象信息
+   * @param nodeType in->request;out->response
+   * @param childTags
+   * @param newDoc
+   */
+  public void dealChildTags(List<XmlObject> childTags, Document newDoc, String nodeType){
+    if (CollUtil.isNotEmpty(childTags)){
+      //获取当前xmlType类型
+      XmlType xmlType = getXmlType();
+      childTags.stream().forEach(childTag -> {
+        //创建子节点的xpath对应的父节点
+        String xpath = childTag.getXpath(xmlType,nodeType);
+        Element parent = createByXPath(newDoc,xpath);
+        if (ObjectUtil.isNotNull(parent)){
+          //设置属性
+          Element node = parent.addElement(childTag.getTagName());
+          node.addAttribute(Constants.NODE_METADATA_ID,childTag.getTagName());
+          String chinese_name = childTag.getAttrs().get(Constants.NODE_CHINESE_NAME);
+          if (StrUtil.isNotBlank(chinese_name)){
+            node.addAttribute(Constants.NODE_CHINESE_NAME,chinese_name);
+          }
+          childTag.attributeContent(node);
+        }
+      });
+    }
+  }
+
+  /**
+   * 给Element节点设置文本值
+   * @param node
+   */
+  public void attributeContent(Node node){
+    attributeContent(node,getContent());
+  }
+
+  /**
+   * 给Element节点设置文本值
+   * @param node 节点
+   * @param content 文本值
+   */
+  public void attributeContent(Node node, String content){
+    if (ObjectUtil.isNotEmpty(node) && StrUtil.isNotBlank(content)){
+      node.setText(content);
+    }
+  }
+
+  /**
+   * 给Element节点属性赋值
+   * @param node 元素节点
+   */
+  public void attributeValue(Element node){
+    Map<String, String> attrs = getAttrs();
+    if (MapUtil.isNotEmpty(attrs)) {
+      for (Map.Entry<String, String> entry : attrs.entrySet()) {
+        node.addAttribute(entry.getKey(), entry.getValue());
+      }
+    }else {
+      log.info("节点【"+node.getName()+"】传入的属性为空");
+    }
+  }
+
+  /**
+   * 使用xpath表达式创建xml中的父节点
+   * @param doc
+   * @param xpath
+   * @return
+   */
+  public static Element createByXPath(Document doc, String xpath){
+
+    if (StrUtil.isBlank(xpath)){
+      log.warn("传入的Xpath为空，无法解析");
+    }
+
+    if (xpath.endsWith("/")){
+      //去除最后面得/号，防止通过Xpath查询的时候报错
+      xpath = xpath.substring(0,xpath.length()-1);
+    }
+
+    if (doc.selectSingleNode(xpath) != null) {
+      log.warn("重复字段：" + doc.selectSingleNode(xpath).getPath() + " [已忽略]");
+      return (Element) doc.selectSingleNode(xpath);
+
+    }
+
+    String path = xpath.substring(0, xpath.lastIndexOf("/"));
+    Element e = (Element) doc.selectSingleNode(path);
+    if (null == e) {
+      e = createByXPath(doc, path);
+      if (Constants.XML_ARRAY.equals(e.getParent().getName().toLowerCase())) {
+        e.addAttribute("metadataid", e.getName());
+        e.addAttribute("type", "array");
+        e.addAttribute("is_struct", "false");
+      }
+    }
+    e = e.addElement(xpath.substring(xpath.lastIndexOf("/") + 1, xpath.length()));
+    return e;
+  }
+
   public Map<String, String> getAttrs() {
     if (this.attrs == null){
       this.attrs = new LinkedHashMap<>();
@@ -399,7 +540,7 @@ public class XmlObject {
 
   public Map<String, List<XmlObject>> getChildTags() {
     if (this.childTags == null){
-      this.childTags = new LinkedHashMap<>();
+      this.childTags = new HashMap<>();
     }
     return childTags;
   }
@@ -496,5 +637,13 @@ public class XmlObject {
 
   public void setPath(String path) {
     this.path = path;
+  }
+
+  public XmlType getXmlType() {
+    return xmlType;
+  }
+
+  public void setXmlType(XmlType xmlType) {
+    this.xmlType = xmlType;
   }
 }
