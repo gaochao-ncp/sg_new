@@ -18,16 +18,6 @@ public interface Constants {
 	 */
 	List<XmlType> XML_TYPE_LIST = Arrays.asList(new XmlType[]{XmlType.SERVICE,XmlType.SERVICE_DEFINITION});
 
-	/**
-	 * 截取 12,3 double类型的数字
-	 */
-	String REGEX = "[0-9]*,[0-9]*";
-
-	/**
-	 * 是否是数字
-	 */
-	String NUMERIC = "[0-9]*";
-
 	String IN_CN = "输入";
 
 	String OUT_CN = "输出";
@@ -78,7 +68,7 @@ public interface Constants {
 	String SHEET_SYSTEM = "消费者接入端口分配";
 
 	/**
-	 * xml中的属性字段
+	 * xml中的属性和节点常量
 	 */
 	String NODE_TYPE = "type";
 	String NODE_LENGTH = "length";
@@ -88,6 +78,9 @@ public interface Constants {
 	String NODE_IS_STRUCT = "is_struct";
 	String NODE_MODE = "mode";
 	String NODE_EXPRESSION = "expression";
+	String NODE_EXPRESSION_VALUE = "/service/SYS_HEAD/ServiceCode+/service/SYS_HEAD/ServiceScene";
+	/** 属性反转，为了匹配正则表达式 **/
+	String NODE_EXPRESSION_VALUE_REVERSE = "\\service\\SYS_HEAD\\ServiceCode+\\service\\SYS_HEAD\\ServiceScene";
 	String NODE_ID = "id";
 	String NODE_ENCODE = "encode";
 	String NODE_VALUE = "value";
@@ -95,11 +88,15 @@ public interface Constants {
 	String NODE_PACKAGE_TYPE_VALUE = "package_type";
 	String NODE_STORE_MODE = "xml";
 	String NODE_STORE_MODE_VALUE = "UTF-8";
+	String NODE_SYSTEMS = "systems";
+	String NODE_SYSTEM = "system";
+	String NODE_ARRAY = "array";
+	String NODE_SERVICE = "service";
+	String NODE_CHANNELS = "channels";
+	String NODE_CHANNEL = "channel";
+	String NODE_SWITCH = "switch";
+	String NODE_BEMIDDLE = "bemiddle";
 
-	/**
-	 * xml中的节点名称
-	 */
-	String XML_ARRAY = "array";
 
 	/**
 	 * 消费渠道和服务系统标识
@@ -112,4 +109,30 @@ public interface Constants {
 	int G = 7;
 	int H = 8;
 
+	String BOOLEAN_FALSE = "false";
+
+	/**
+	 * 正则表达式
+	 */
+	/**
+	 * 截取 [@*']中间的字符
+	 */
+	String ATTRS_REGX = "\\[@[^\\/]*']";
+
+	/**
+	 * 截取 12,3 double类型的数字
+	 */
+	String REGEX = "[0-9]*,[0-9]*";
+
+	/**
+	 * 切割类似于 /array/xxx/。将array节点后面的一个节点一起匹配下来
+	 */
+	String REGEX_ARRAY = "\\/array\\/[a-zA-Z]+\\/";
+
+	/**
+	 * 是否是数字
+	 */
+	String NUMERIC_REGEX = "[0-9]*";
+
+  String SMRTLR = "SMRTLR";
 }

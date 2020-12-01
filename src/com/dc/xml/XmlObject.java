@@ -1,12 +1,12 @@
 package com.dc.xml;
 
 import cn.hutool.core.collection.CollUtil;
-import cn.hutool.core.collection.ListUtil;
 import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.log.Log;
 import cn.hutool.log.LogFactory;
+import com.dc.common.CommonUtil;
 import com.dc.common.Constants;
 import com.dc.config.HrConfig;
 import com.dc.config.HrSystem;
@@ -87,7 +87,7 @@ public class XmlObject {
   /**
    * 根据这个类型生成对应的Xpath路径。必须存在该值，不然程序报错停止
    * 应用位置为：
-   * {@link XpathParser#ofTransfer(XmlObject)}
+   * {@link XpathParser#ofTransferUnpack(XmlObject)}
    */
   private XmlType xmlType;
 
@@ -231,11 +231,17 @@ public class XmlObject {
         }
       }
 
+      boolean stopFlag = false;
       if (!ObjectUtil.isNotEmpty(getSystem().get(Constants.CONSUMER_CHANNEL))){
         log.warn("c端渠道：【"+index.getConsumerName()+"】无法找到对应的信息，请检查配置");
+        stopFlag=true;
       }
       if (!ObjectUtil.isNotEmpty(getSystem().get(Constants.PROVIDER_SYSTEM))){
         log.warn("P端渠道：【"+index.getProviderName()+"】无法找到对应的信息，请检查配置");
+        stopFlag=true;
+      }
+      if (stopFlag){
+        System.exit(0);
       }
     }
   }
@@ -256,14 +262,13 @@ public class XmlObject {
       if (row.isDeleteFlag()){
         return;
       }
-      //String xpath = getXpath(row.getPath(),nodeType);//此处不再生成Xpath节点信息，因为没办法针对不同类型的文件。xpath setChildXpath 方法进行赋值
       //创建新节点加入:
       XmlObject node;
-      if (Constants.XML_ARRAY.equals(row.getType())){
+      if (Constants.NODE_ARRAY.equals(row.getType())){
         //type节点做特殊处理 此处Xpath的值为：xpath+"array"，因为赋值地方更改，所以将array赋值给path
-        node = XpathParser.createNode(row.getTagName(), null, row.getPath()+"/array/",this.serviceCode);//
-        node.setAttrs("type","array");
-        node.setAttrs("is_struct","false");
+        node = XpathParser.createNode(row.getTagName(), null, row.getPath()+"/"+Constants.NODE_ARRAY+"/",this.serviceCode);//
+        node.setAttrs(Constants.NODE_TYPE,Constants.NODE_ARRAY);
+        node.setAttrs(Constants.NODE_IS_STRUCT,Constants.BOOLEAN_FALSE);
       }else {
         //这里的this.serviceCode是父节点的serviceCode
         node = XpathParser.createNode(row.getTagName(), null, row.getPath(),this.serviceCode);
@@ -316,9 +321,21 @@ public class XmlObject {
   }
 
   /**
+   * 处理统一前端请求的的路径信息
+   * @return
+   */
+  public String getSmrtlr(){
+    String xpath = "/"+this.path;
+    if (xpath.startsWith("/service/BODY") && xpath.contains("array")){
+      xpath = CommonUtil.regexArray(xpath);
+    }
+    return xpath.replaceAll("/+","/");
+  }
+
+  /**
    * 处理路径信息，将路径信息转换为Xpath所需要的格式
    * @param xmlType
-   * @param nodeType 输入，输出字段决定服务定义文件中的xml报文节点组成。in->request;out->response
+   * @param nodeType 输入，输出字段决定服务定义文件中的xml报文节点组成。in->request;out->response;当为服务识别或者系统识别时，传入的是服务码
    * @return
    */
   public String getXpath(XmlType xmlType,String nodeType){
@@ -328,11 +345,11 @@ public class XmlObject {
     }else if (XmlType.SERVICE.equals(xmlType)) {
       Xpath = "/"+this.path;
     }else if (XmlType.SYSTEM_IDENTIFY.equals(xmlType)){
-      //系统识别不在这里处理
-      return Xpath;
+      //系统识别
+      Xpath = "/"+Constants.NODE_SYSTEMS+"/"+Constants.NODE_SYSTEM+"[@id='"+nodeType+"']";
     }else if (XmlType.SERVICE_IDENTIFY.equals(xmlType)){
-      //系统识别不在这里处理
-      return Xpath;
+      //服务识别
+      Xpath = "/"+Constants.NODE_CHANNELS+"/"+Constants.NODE_CHANNEL+"[@id='"+nodeType+"' and @type='dynamic']/"+Constants.NODE_SWITCH+"[@mode='xml' and @expression='"+Constants.NODE_EXPRESSION_VALUE_REVERSE+"' and @encode='UTF-8']";
     }else if (XmlType.SERVICE_DEFINITION.equals(xmlType)){
       // /S0200200000510/request/sdoroot  /S0200200000510/response/sdoroot
       Xpath = path.replace("service","/S"+this.serviceCode+"/"+nodeType+"/sdoroot");
@@ -353,7 +370,7 @@ public class XmlObject {
    */
   public boolean verifyArray(String path){
     String[] split = path.split("\\/");
-    if (Constants.XML_ARRAY.equals(split[split.length-2])){
+    if (Constants.NODE_ARRAY.equals(split[split.length-2])){
       return true;
     }
     return false;
@@ -439,20 +456,55 @@ public class XmlObject {
       //获取当前xmlType类型
       XmlType xmlType = getXmlType();
       childTags.stream().forEach(childTag -> {
-        //创建子节点的xpath对应的父节点
-        String xpath = childTag.getXpath(xmlType,nodeType);
-        Element parent = createByXPath(newDoc,xpath);
-        if (ObjectUtil.isNotNull(parent)){
-          //设置属性
-          Element node = parent.addElement(childTag.getTagName());
-          node.addAttribute(Constants.NODE_METADATA_ID,childTag.getTagName());
-          String chinese_name = childTag.getAttrs().get(Constants.NODE_CHINESE_NAME);
-          if (StrUtil.isNotBlank(chinese_name)){
-            node.addAttribute(Constants.NODE_CHINESE_NAME,chinese_name);
-          }
-          childTag.attributeContent(node);
-        }
+        dealChildTags(childTag,newDoc,nodeType,xmlType,"");
       });
+    }
+  }
+
+  /**
+   * 处理统一图形前端特殊的BODY数组结构
+   * @param childTags
+   * @param newDoc
+   * @param nodeType
+   * @param consumerCode
+   */
+  public void dealChildTags(List<XmlObject> childTags, Document newDoc, String nodeType,String consumerCode){
+    if (CollUtil.isNotEmpty(childTags)){
+      //获取当前xmlType类型
+      XmlType xmlType = getXmlType();
+      childTags.stream().forEach(childTag -> {
+        dealChildTags(childTag,newDoc,nodeType,xmlType,consumerCode);
+      });
+    }
+  }
+
+  /**
+   * 处理子节点的信息
+   * @param childTag
+   * @param newDoc
+   * @param nodeType
+   */
+  public void dealChildTags(XmlObject childTag, Document newDoc, String nodeType,XmlType xmlType,String consumerCode){
+    //创建子节点的xpath对应的父节点
+    String xpath = (Constants.SMRTLR.equals(consumerCode))?childTag.getSmrtlr():childTag.getXpath(xmlType,nodeType);
+    Element parent = createByXPath(newDoc,xpath);
+    if (ObjectUtil.isNotNull(parent)){
+      Element node = parent.addElement(childTag.getTagName());
+      if (Constants.SMRTLR.equals(consumerCode)
+              && Constants.NODE_ARRAY.equals(childTag.getAttrs().get(Constants.NODE_TYPE))
+              && xpath.startsWith("/service/BODY")){
+        //统一图形前端给array节点做特殊处理
+        node.addAttribute(Constants.NODE_BEMIDDLE,"true");
+      }else {
+        //设置属性
+        node.addAttribute(Constants.NODE_METADATA_ID,childTag.getTagName());
+        String chinese_name = childTag.getAttrs().get(Constants.NODE_CHINESE_NAME);
+        if (StrUtil.isNotBlank(chinese_name)){
+          node.addAttribute(Constants.NODE_CHINESE_NAME,chinese_name);
+        }
+      }
+      //设置文本值
+      childTag.attributeContent(node);
     }
   }
 
@@ -498,33 +550,46 @@ public class XmlObject {
    */
   public static Element createByXPath(Document doc, String xpath){
 
-    if (StrUtil.isBlank(xpath)){
-      log.warn("传入的Xpath为空，无法解析");
-    }
-
-    if (xpath.endsWith("/")){
-      //去除最后面得/号，防止通过Xpath查询的时候报错
-      xpath = xpath.substring(0,xpath.length()-1);
-    }
+    xpath = CommonUtil.standardXpath(xpath);
 
     if (doc.selectSingleNode(xpath) != null) {
-      log.warn("重复字段：" + doc.selectSingleNode(xpath).getPath() + " [已忽略]");
+      //log.warn("忽略重复节点【" + doc.selectSingleNode(xpath).getPath() + "】");
       return (Element) doc.selectSingleNode(xpath);
-
     }
 
     String path = xpath.substring(0, xpath.lastIndexOf("/"));
-    Element e = (Element) doc.selectSingleNode(path);
+    //这里的path需要经过正则处理后才可以使用。创建父节点
+    Element e = (Element) doc.selectSingleNode(CommonUtil.deleteAttr(path));
     if (null == e) {
       e = createByXPath(doc, path);
-      if (Constants.XML_ARRAY.equals(e.getParent().getName().toLowerCase())) {
-        e.addAttribute("metadataid", e.getName());
-        e.addAttribute("type", "array");
-        e.addAttribute("is_struct", "false");
+      if (Constants.NODE_ARRAY.equals(e.getParent().getName().toLowerCase())) {
+        e.addAttribute(Constants.NODE_METADATA_ID, e.getName());
+        e.addAttribute(Constants.NODE_TYPE, Constants.NODE_ARRAY);
+        e.addAttribute(Constants.NODE_IS_STRUCT, Constants.BOOLEAN_FALSE);
+      }else {
+        setAttr(e,path);
       }
     }
-    e = e.addElement(xpath.substring(xpath.lastIndexOf("/") + 1, xpath.length()));
+    //创建子节点
+    String childXpath = xpath.substring(xpath.lastIndexOf("/") + 1, xpath.length());
+    e = e.addElement(CommonUtil.deleteAttr(childXpath));
+    setAttr(e,childXpath);
     return e;
+  }
+
+  /**
+   * 截取xpath中的属性，并且给节点设置属性值
+   * @param e
+   * @param path
+   */
+  public static void setAttr(Element e,String path){
+    //获取Xpath中的属性列表.不支持文本节点的解析设置。请特别注意，不然会出错
+    Map<String, String> attrs = CommonUtil.matcher(path);
+    if (MapUtil.isNotEmpty(attrs)){
+      for (Map.Entry<String, String> attr : attrs.entrySet()) {
+        e = e.addAttribute(attr.getKey(), attr.getValue());
+      };
+    }
   }
 
   public Map<String, String> getAttrs() {

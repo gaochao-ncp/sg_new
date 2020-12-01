@@ -38,7 +38,7 @@ public class XmlMetadata {
   /**
    * 系统和服务码映射：key：系统代码 ；value：服务码列表。目的是用来生成服务识别和系统识别文件
    */
-  private Map<String,List<String>> serviceCodeMapping ;
+  private Map<HrSystem,List<String>> serviceCodeMapping ;
 
   /**
    * 解析xmlObject
@@ -94,13 +94,18 @@ public class XmlMetadata {
     }
   }
 
+  /**
+   * 解析系统和服务码信息
+   * @param system
+   * @param serviceCode
+   */
   private void parseSystemInfo(HrSystem system,String serviceCode){
     if (ObjectUtil.isNotNull(system)){
       List<String> codeList = getServiceCodeMapping().get(system.getCode());
       if (CollUtil.isEmpty(codeList)){
         List<String> list = new ArrayList<>();
         list.add(serviceCode);
-        getServiceCodeMapping().put(system.getCode(), list);
+        getServiceCodeMapping().put(system, list);
       }else {
         codeList.add(serviceCode);
       }
@@ -147,14 +152,14 @@ public class XmlMetadata {
     this.xmlObjectList = xmlObjectList;
   }
 
-  public Map<String, List<String>> getServiceCodeMapping() {
+  public Map<HrSystem, List<String>> getServiceCodeMapping() {
     if (MapUtil.isEmpty(serviceCodeMapping)){
       this.serviceCodeMapping = new LinkedHashMap<>();
     }
     return serviceCodeMapping;
   }
 
-  public void setServiceCodeMapping(Map<String, List<String>> serviceCodeMapping) {
+  public void setServiceCodeMapping(Map<HrSystem, List<String>> serviceCodeMapping) {
     this.serviceCodeMapping = serviceCodeMapping;
   }
 
